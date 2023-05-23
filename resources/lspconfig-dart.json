@@ -1,0 +1,34 @@
+{ "dart" : {
+   "analysisExcludedFolders" : [ $EXCLUDE$ ],
+   "enableSdkFormatter" : true;
+   "lineLength" : 80,
+   "completeFunctionCalls" : true,
+   "showTodos" : true,
+   "renameFilesWithClasses" : "always",
+   "enableSnippets" : true,
+   "updateImportsOnRename" : true,
+   "documentation" : "summary",
+   "includeDependenciesInWorkspaceSymbols" : true
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,188 @@
+/********************************************************************************/
+/*                                                                              */
+/*              LspBaseUtil.java                                                */
+/*                                                                              */
+/*      Utility methods for LSP -- mainly output                                */
+/*                                                                              */
+/********************************************************************************/
+/*      Copyright 2011 Brown University -- Steven P. Reiss                    */
+/*********************************************************************************
+ *  Copyright 2011, Brown University, Providence, RI.                            *
+ *                                                                               *
+ *                        All Rights Reserved                                    *
+ *                                                                               *
+ * This program and the accompanying materials are made available under the      *
+ * terms of the Eclipse Public License v1.0 which accompanies this distribution, *
+ * and is available at                                                           *
+ *      http://www.eclipse.org/legal/epl-v10.html                                *
+ *                                                                               *
+ ********************************************************************************/
+
+
+
+package edu.brown.cs.bubbles.lspbase;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import edu.brown.cs.ivy.xml.IvyXmlWriter;
+
+class LspBaseUtil implements LspBaseConstants
+{
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Private Storage                                                         */
+/*                                                                              */
+/********************************************************************************/
+
+private static final String [] SymbolKinds = {
+   "None", "File", "Module", "Namespace", "Package",
+   "Class", "Method", "Property", "Field", "Constructor",
+   "Enum", "Interface", "Function", "Variable", "Constant",
+   "String", "Number", "Boolean", "Array", "Object",
+   "Key", "Null", "EnumMember", "Struct", "Event",
+   "Operator", "TypeParameter",
+};
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Constructors                                                            */
+/*                                                                              */
+/********************************************************************************/
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Symbol output                                                           */
+/*                                                                              */
+/********************************************************************************/
+
+
+static void outputLspSymbol(LspBaseProject project,
+      LspBaseFile file,JSONObject sym,IvyXmlWriter xw)
+{
+   outputLspSymbol(project,file,sym,null,xw);
+}
+ 
+
+static void outputLspSymbol(LspBaseProject project,
+      LspBaseFile file,JSONObject sym,String pfx,IvyXmlWriter xw)
+{
+    outputSymbol(project,file,sym,pfx,xw);
+    JSONArray arr = sym.optJSONArray("children");
+    if (arr != null) {
+       if (pfx == null) pfx = sym.getString("name");
+       else pfx = pfx + "." + sym.getString("name");
+       for (int i = 0; i < arr.length(); ++i) {
+          outputLspSymbol(project,file,arr.getJSONObject(i),pfx,xw);
+        }
+     }
+}
+
+
+
+private static void outputSymbol(LspBaseProject project,LspBaseFile file,JSONObject sym,String pfx,IvyXmlWriter xw)
+{
+   String xpfx = (pfx == null ? "" : pfx + ".");
+   xw.begin("ITEM");
+   xw.field("PROJECT",project.getName());
+   xw.field("PATH",file.getPath());
+   xw.field("NAME",sym.getString("name"));
+   xw.field("TYPE",SymbolKinds[sym.getInt("kind")]);
+   JSONObject range = sym.getJSONObject("range");
+   
+   outputRange(false,file,range,xw);
+   JSONObject srange = sym.getJSONObject("selectionRange");
+   outputRange(true,file,srange,xw);
+   
+   String qnam = xpfx + sym.getString("name");
+   String hdl = project.getName() + ":" + qnam;
+   String det = sym.optString("detail");
+   if (det != null) {
+      String xdet = cleanDetail(det);
+      // remove variable names from detail
+      hdl += xdet;
+    }
+   xw.field("QNAME",qnam);
+   xw.field("HANDLE",hdl);
+   xw.end("ITEM");
+}
+
+
+
+private static String cleanDetail(String det)
+{
+   StringBuffer buf = new StringBuffer();
+   int state = 0;
+   int lvl = 0;
+   for (int i = 0; i < det.length(); ++i) {
+      char c = det.charAt(i);
+      switch (state) {
+         case 0 :
+            buf.append(c);
+            if (c == '(') state = 1;
+            break;
+         case 1 :
+            if (c == '<') ++lvl;
+            else if (c == '>' && lvl > 0) --lvl;
+            else if (c == ' ') {
+               if (lvl == 0) state = 2;
+               break;
+             }
+            else if (c == ')') state = 3;
+            buf.append(c);
+            break;
+         case 2 :
+            if (c == ',' || c == ')') {
+               state = 3;
+               buf.append(c);
+             }
+            break;
+         case 3 :
+            buf.append(c);
+            break;
+       }
+    }
+   
+   return buf.toString();
+}
+
+
+
+private static void outputRange(boolean extended,LspBaseFile file,JSONObject range,IvyXmlWriter xw)
+{
+   JSONObject start = range.getJSONObject("start");
+   JSONObject end = range.getJSONObject("end");
+   int ln0 = start.getInt("line") + 1;
+   int ch0 = start.getInt("character") + 1;
+   int pos0 = file.mapLineCharToOffset(ln0,ch0);
+   int ln1 = end.getInt("line") + 1;
+   int ch1 = end.getInt("character") + 1;
+   int pos1 = file.mapLineCharToOffset(ln1,ch1);
+   if (!extended) {
+      xw.field("LINE",ln0);
+      xw.field("COL", ch0);
+      xw.field("STARTOFFSET",pos0);
+      xw.field("ENDOFFSET",pos1-1);
+      xw.field("LENGTH",pos1-pos0);
+    }
+   else {
+      xw.field("NAMEOFFSET",pos0);
+      xw.field("NAMELENGTH",pos1-pos0);
+    }
+}
+
+
+
+
+}       // end of class LspBaseUtil
+
+
+
+
+/* end of LspBaseUtil.java */
+
