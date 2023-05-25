@@ -113,7 +113,7 @@ private void runTest()
    
    String proj = "darttest";
    String ws = "/Users/spr/Lsp/test";
-   String fil = "/pro/iot/fliutter/alds/lib/main.dart";
+   String fil = "/pro/iot/flutter/alds/lib/main.dart";
    
    sendCommand("PING",null,null,null);
    sendCommand("ENTER",null,null,null);
@@ -142,8 +142,6 @@ private void runTest()
    sendCommand("ELIDESET",proj,
          new CommandArgs("FILE",fil,"COMPUTE",true),
          "<REGION START='1993' END='2392' />");
-   sendCommand("FINDPACKAGE",proj,
-         new CommandArgs("NAME","main.dart"),null);
    sendCommand("ELIDESET",proj,
          new CommandArgs("FILE",fil,"COMPUTE",true),null);
    sendCommand("STARTFILE",proj,
@@ -163,9 +161,6 @@ private void runTest()
          new CommandArgs("FILE",fil,"START",2154,"END",2154),null);
    sendCommand("COMMIT",proj,
          new CommandArgs("SAVE",true),null);
-   sendCommand("GETALLNAMES",proj,
-         new CommandArgs("BACKGROUND","NAME_2234"),null);
-   waitForNames(); 
    sendCommand("SAVEWORKSPACE",null,
          new CommandArgs("WS",ws),null);
 }

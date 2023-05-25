@@ -57,7 +57,8 @@ private String          project_name;
 private String          project_language;
 private File            base_directory;
 private List<LspBasePathSpec> project_paths;
-private Map<String,LspBaseFile> project_files;
+private Map<String,LspBaseFile> file_map;
+private List<LspBaseFile> project_files;
 private boolean         is_open;
 private LspBaseProtocol use_protocol;
 private LspBasePreferences project_preferences;
@@ -79,7 +80,8 @@ LspBaseProject(LspBaseMain lm,LspBaseProjectManager pm,String name,File base)
    if (name == null) name = base.getName();
    project_name = name;
    project_paths = new ArrayList<>();
-   project_files = new LinkedHashMap<>();
+   project_files = new ArrayList<>();
+   file_map = new HashMap<>();
    project_preferences = new LspBasePreferences(pm.getSystemPreferences());
    edit_parameters = new HashMap<>();
    
@@ -128,7 +130,7 @@ LspBasePreferences getPreferences()             { return project_preferences; }
 
 LspBaseFile findFile(String path)
 {
-   return project_files.get(path);
+   return file_map.get(path);
 }
 
 LspBaseFile findFile(File f)
@@ -204,10 +206,13 @@ private LspBaseFile addLspFile(File file,boolean reload)
       return lbf0;
     }
    
+   LspLog.logD("Add File " + file.getAbsolutePath());
+   
    LspBaseFile lbf = new LspBaseFile(this,file,project_language);
-   project_files.put(file.getAbsolutePath(),lbf);
+   project_files.add(lbf);
+   file_map.put(file.getAbsolutePath(),lbf);
    try {
-      project_files.put(file.getCanonicalPath(),lbf);
+      file_map.put(file.getCanonicalPath(),lbf);
     }
    catch (IOException e) { }
    
@@ -225,7 +230,7 @@ private LspBaseFile addLspFile(File file,boolean reload)
 
 void getAllNames(LspNamer namer)
 {
-   for (LspBaseFile lbf : project_files.values()) {
+   for (LspBaseFile lbf : project_files) {
       JSONObject tdi = createJson("uri",lbf.getUri());
       use_protocol.sendMessage("textDocument/documentSymbol",
             new NameHandler(namer,this,lbf),
@@ -267,7 +272,7 @@ private class NameHandler implements LspResponder {
 void commit(String bid,boolean refresh,boolean save,List<Element> files,IvyXmlWriter xw)
 {
    if (files == null || files.size() == 0) {
-      for (LspBaseFile lbf : project_files.values()) {
+      for (LspBaseFile lbf : project_files) {
          if (refresh || !save || lbf.hasChanged()) {
             commitFile(lbf,bid,refresh,save,xw);
           }
@@ -322,7 +327,7 @@ void build(boolean refresh,boolean reload)
    
    Set<LspBaseFile> oldfiles = null;
    if (refresh) {
-      oldfiles = new HashSet<>(project_files.values());
+      oldfiles = new HashSet<>(project_files);
       if (reload) {
          project_files.clear();
        }
@@ -441,7 +446,7 @@ void outputXml(IvyXmlWriter xw)
    for (LspBasePathSpec ps : project_paths) {
       ps.outputXml(xw);
     }
-   for (LspBaseFile fd : project_files.values()) {
+   for (LspBaseFile fd : project_files) {
       outputFile(fd,xw);
     }
 // nobase_prefs.outputXml(xw);
@@ -469,7 +474,7 @@ void outputProject(boolean files,boolean paths,boolean clss,boolean opts,IvyXmlW
       xw.end("CLASSPATH");
     }
    if (files) {
-      for (LspBaseFile fd : project_files.values()) {
+      for (LspBaseFile fd : project_files) {
 	 outputFile(fd,xw);
        }
     }

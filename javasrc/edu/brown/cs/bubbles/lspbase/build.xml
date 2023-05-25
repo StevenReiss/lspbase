@@ -1,0 +1,65 @@
+<project name='bubbles.nobase' default='jar'>
+
+   <property file='../../../../../../build.properties' />
+   <property name='PRO' value='/pro' />
+   <property name='BUBBLES' value='/pro/bubbles' />
+   <property name='LSPBASE' value='/pro/lsp' />
+   <available file="${PRO}/ivy" type="dir" property="ivy.present" />
+   <target name="init1" if="ivy.present" >
+      <property name='IVYBIN' value='${PRO}/ivy/java' />
+      <property name='IVYLIB' value='${PRO}/ivy/lib' />
+   </target>
+   <target name="init2" unless="ivy.present" >
+      <property name='IVYBIN' value='${PRO}/ivy/lib/ivy.jar' />
+      <property name='IVYLIB' value='${PRO}/ivy/lib' />
+   </target>
+   <target name='init' depends='init1,init2' >
+      <path id='lspbase.classpath'>
+	 <pathelement location='${LSPBASE}/java' />
+	 <pathelement location='${IVYBIN}' />
+	 <fileset dir='${IVYLIB}/' includes='json.jar' />
+      </path>
+      <path id='test.classpath'>
+	 <pathelement location='${LSPBASE}/java' />
+	 <pathelement location='${IVYBIN}' />
+	 <fileset dir='${IVYLIB}/' includes='json.jar' />
+      </path>
+   </target>
+
+   <target name='compile10' depends='init'>
+      <javac srcdir='.' destdir='${LSPBASE}/java' debug='on' deprecation='on'
+		source='10' target='10'
+		includeantruntime='false'>
+	 <classpath refid='lspbase.classpath' />
+	 <compilerarg line='--add-modules jdk.incubator.httpclient' />
+      </javac>
+   </target>
+
+   <target name='compile' depends='init'>
+      <javac srcdir='.' destdir='${LSPBASE}/java' debug='on' deprecation='on'
+		target='10' source='10'
+		includeantruntime='false'>
+	 <classpath refid='lspbase.classpath' />
+      </javac>
+   </target>
+
+   <target name='clean'>
+      <delete dir='${LSPBASE}/java/edu/brown/cs/bubbles/nobase' />
+   </target>
+
+   <target name='test' depends='compile'>
+      <java classname='edu.brown.cs.bubbles.nobase.LspBaseTest' fork='true' output='test.out' >
+	 <classpath refid='test.classpath' />
+      </java>
+   </target>
+
+   <target name='jar' depends='compile'>
+      <jar destfile='lspbase.jar'>
+	 <fileset dir='${LSPBASE}/java' includes='**/*.class' />
+	 <fileset dir='${LSPBASE}/resources' includes='*.json' />
+      </jar>
+      <copy file='lspbase.jar' tofile='${BUBBLES}/lib/lspbase.jar' />
+   </target>
+
+
+</project>

@@ -97,6 +97,7 @@ String getContents() {
          String cnts = IvyFile.loadFile(for_file);
          GapContent gc = new GapContent(cnts.length()+1024);
          gc.insertString(0,cnts);
+         file_contents = gc;
        }
       catch (Exception e) {
          file_contents = new GapContent();
@@ -224,8 +225,9 @@ void open()
 {
    if (file_version > 0) return;
    
-   for_project.openFile(this);
    getContents();
+   
+   for_project.openFile(this);
    file_version = 1;
 } 
 

@@ -145,4 +145,5 @@ javadep1
 lvylib.jar
 ivysrc.jar
 lib/ivy.jar
-
+**/lspbase.jar
+**/test.log

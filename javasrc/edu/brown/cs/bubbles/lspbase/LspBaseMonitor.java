@@ -233,10 +233,14 @@ private String handleCommand(String cmd,String proj,Element xml) throws LspBaseE
       case "GETALLNAMES" :
       case "PREFERENCES" :
       case "SETPREFERENCES" :
-      case "EDITPARAM" :
          lsp_base.getProjectManager().handleCommand(cmd,proj,xml,xw);
          break;
-         
+      case "EDITPARAM" :
+      case "ELIDESET" :
+      case "STARTFILE" :
+      case "COMMIT" :
+         lsp_base.getProjectManager().handleEditCommand(cmd,proj,xml,xw);
+         break;
       case "GETRUNCONFIG" :
       case "NEWRUNCONFIG" :
       case "EDITRUNCONFIG" :

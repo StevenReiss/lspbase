@@ -129,7 +129,7 @@ private LspBaseMain(String [] args)
    File f3 = new File(f2,".ivy");
    if (!f3.exists() || !IvySetup.setup(f3)) IvySetup.setup();
    
-   File f5 = new File(hm,"Nobbles");
+   File f5 = new File(hm,"Lsp");
    work_directory = new File(f5,"workspace");
    
    mint_handle = System.getProperty("edu.brown.cs.bubbles.MINT");
@@ -160,6 +160,7 @@ private LspBaseMain(String [] args)
 
 private void scanArgs(String [] args)
 {
+   boolean havelog = false;
    for (int i = 0; i < args.length; ++i) {
       if (args[i].startsWith("-")) {
 	 if (args[i].startsWith("-m") && i+1 < args.length) {           // -m <mint handle>
@@ -172,6 +173,10 @@ private void scanArgs(String [] args)
          else if (args[i].startsWith("-log") && i+1 < args.length) {     // -log <logfile>
             LspLog.setLogFile(new File(args[++i]));
             LspLog.setUseStdErr(false);
+            havelog = true;
+          }
+         else if (args[i].startsWith("-lang") && i+1 < args.length) {
+            LspLog.logD("SET LANGUAGE TO " + args[++i]);
           }
          else if (args[i].startsWith("-err")) {                         // -err
             LspLog.setUseStdErr(true);
@@ -180,13 +185,18 @@ private void scanArgs(String [] args)
        }
       else badArgs();
     }
+   
+   if (!havelog) {
+      File f = new File(work_directory,"lspbase_log.log");
+      LspLog.setLogFile(f);
+    }
 }
 
 
 
 private void badArgs()
 {
-   System.err.println("NOBBLES: nobasemain [-m <mint>]");
+   System.err.println("LSPBASE: LspBaseMain [-m <mint>]");
    System.exit(1);
 }
 

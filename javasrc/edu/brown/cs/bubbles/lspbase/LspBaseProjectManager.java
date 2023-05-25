@@ -222,6 +222,34 @@ void handleCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
 }
 
 
+void handleEditCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   switch(cmd) {
+      case "EDITPARAM" :
+         handleEditParam(proj,IvyXml.getAttrString(xml,"BID","*"),
+               IvyXml.getAttrString(xml,"NAME"),
+               IvyXml.getAttrString(xml,"VALUE"));
+         break;
+      case "ELIDESET" :
+         break;
+      case "STARTFILE" :
+         handleStartFile(proj,IvyXml.getAttrString(xml,"BID","*"),
+               IvyXml.getAttrString(xml,"FILE"),xw);
+         break;
+      case "COMMIT" :
+         handleCommit(proj,IvyXml.getAttrString(xml,"BID","*"),
+               IvyXml.getAttrBool(xml,"REFRESH"),
+               IvyXml.getAttrBool(xml,"SAVE"),
+               LspBaseMonitor.getElements(xml,"FILES"),xw);
+         break;
+    }
+}
+
+
+
+ 
+
 
 /********************************************************************************/
 /*										*/
@@ -295,6 +323,7 @@ void handleCommit(String proj,String bid,boolean refresh,boolean save,List<Eleme
 
 
 
+
 /********************************************************************************/
 /*                                                                              */
 /*      Editing commands                                                        */
@@ -307,6 +336,19 @@ void handleEditParam(String proj,String bid,String name,String value)
    forAllProjects(proj,
          (LspBaseProject p) -> p.handleEditParameter(bid,name,value));
 }
+
+
+
+void handleStartFile(String proj,String bid,String file,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseProject lbp = findProject(proj);
+   if (lbp == null) throw new LspBaseException("Project " + proj + " not found");
+   LspBaseFile lbf = lbp.findFile(file);
+   if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
+   lbf.open();
+}
+
 
 
 /********************************************************************************/
