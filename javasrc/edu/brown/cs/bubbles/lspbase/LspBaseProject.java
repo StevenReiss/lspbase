@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -130,6 +131,15 @@ LspBasePreferences getPreferences()             { return project_preferences; }
 
 LspBaseFile findFile(String path)
 {
+   if (path == null) return null;
+   if (path.startsWith("file:/")) {
+      int j = 0;
+      for (int i = 5; i < path.length(); ++i) {
+         if (path.charAt(i) == '/') j = i;
+         else break;
+       }
+      path = path.substring(j);
+    }
    return file_map.get(path);
 }
 
@@ -390,25 +400,148 @@ void build(boolean refresh,boolean reload)
 /********************************************************************************/
 
 void patternSearch(String pat,String typ,boolean defs,boolean refs,boolean system,IvyXmlWriter xw)
+      throws LspBaseException
 {
-   //TODO: might need to modify pattern here
-   SearchResult sr = new SearchResult();
+   if (pat.startsWith("null.")) pat = pat.substring(5);
+   String fpat = pat;
+   int idx = pat.indexOf("(");
+   if (idx >= 0) fpat = pat.substring(0,idx);
+   
+   // TYPE PATTERNS: [qualification '.']typeName ['<' typeArguments '>']
+   //                [moduleName1[,moduleName2,..]]/[qualification '.']typeName ['<' typeArguments '>']
+   // METHOD PATTERNS:
+   //      [declaringType '.'] ['<' typeArguments '>'] methodName ['(' parameterTypes ')'] [returnType] 
+   // CONSTRUCTOR PATTERNS:
+   //     ['<' typeArguments '>'] [declaringQualification '.'] typeName ['(' parameterTypes ')']
+   // FIELD PATTERNS:
+   //     [declaringType '.'] fieldName [fieldType]
+   // PACKAGE PATTERNS:
+   //      packageNameSegment {'.' packageNameSegment}
+   // Patterns can include '*' for any string 
+   
+   // LSP patterns: match if every character of the pattern occurs in the string in the
+   //   same order as in the pattern, and the first letters of separate words in pattern
+   //   are aligned with words in the string.  Matching is case-insensitive, but case 
+   //   matches get higher scores
+   
+   // Also, LSP workspace/symbol only matches on name, not other fields
+   
+   // From the pattern, based on type of pattern, create:
+   //           mpat :: simple string to match against (remove *, only consider name)
+   //           cpat :: pattern for container
+   //           fpat :: pattern for file (actually name of file if known)
+   //           tpat :: return type/fieldType -- might not be available
+   
+   
+   //TODO: pattern from bubbles and pattern to lsp are different -- create simplified
+   //   pattern for lsp and do actual matching of pattern in DeclSearchResult
+   //   might need to get file id from pattern as well
+   
+   DeclSearchResult sr = new DeclSearchResult(pat,typ,system);
    use_protocol.sendMessage("workspace/symbol",
          (Object data,JSONObject err) -> sr.addResult((JSONArray) data,err),
-         "query",pat);
+         "query",fpat);
+   
+   List<JSONObject> rslts = sr.getResults();
+   if (rslts.isEmpty()) return;
+  
+   if (defs && !refs) {
+      // output results
+    }
+   else {
+      // THIS ISN'T USED -- can generate exception?
+      // For each definition, find references and add those to list
+      // then output results -- or use includeDeclaration flag
+    }
    
 }
 
 
 
-private class SearchResult {
+private class DeclSearchResult {
+   
+   private String name_pattern;
+   private Set<Integer> valid_types;
+   private boolean allow_system;
+   private List<JSONObject> result_syms;
+   
+   DeclSearchResult(String pat,String typ,boolean system) {
+      // possible do all pattern computation here and provide call to get search pattern
+      // move this to a separate file
+      // name_pattern: should be REGEX for name
+      // cpat_pattern: REGEX for container
+      // file_pattern:
+      
+      name_pattern = pat;
+      allow_system = system;
+      valid_types = null;
+      switch (typ) {
+         case "CONSTRUCTOR" :
+            valid_types = Set.of(9);
+            break;
+         case "METHOD" :
+            valid_types = Set.of(6,12,21);
+            break;
+         case "FIELD" :
+            valid_types = Set.of(8,13,14,20,22);
+            break;
+         case "TYPE" :
+            valid_types = Set.of(5,7,10,11,23);
+            break;
+         case "PACKAGE" :
+            valid_types = Set.of(2,3,4);
+            break;
+         case "MODULE" :
+            valid_types = Set.of(2);
+            break;
+         case "CLASS" :
+            valid_types = Set.of(5);
+            break;
+         case "INTERFACE" :
+            valid_types = Set.of(11);
+            break;
+         case "ENUM" :
+            valid_types = Set.of(10);
+            break;
+         case "CLASS_AND_ENUM" :
+            valid_types = Set.of(5,10);
+            break;
+         case "CLASS_AND_INTERFACE" :
+            valid_types = Set.of(5,11);
+            break;
+         case "ANNOTATION" :
+            valid_types = Set.of(7);
+            break;
+         default :
+            LspLog.logE("Unknown search type " + typ);
+            break;
+       }
+      result_syms = new ArrayList<>();
+    }
+   
+   List<JSONObject> getResults()                        { return result_syms; }
    
    void addResult(JSONArray syms,JSONObject err) { 
       if (err != null) {
          LspLog.logD("Search Result Error " + err.toString(2));
        }
       else {
-         LspLog.logD("Search Result " + syms.toString(2));
+         for (int i = 0; i < syms.length(); ++i) {
+            JSONObject sym = syms.getJSONObject(i);
+            String nm = sym.getString("name");
+            if (!nm.startsWith(name_pattern)) continue;          // need better match
+            int kind = sym.getInt("kind");
+            if (valid_types != null && !valid_types.contains(kind)) continue;
+            String container = sym.optString("containerName");
+            JSONObject loc = sym.getJSONObject("location");
+            String uri = loc.getString("uri");
+            if (!allow_system) {
+               LspBaseFile lbf = findFile(uri);
+               if (lbf == null) continue;
+             }
+            LspLog.logD("Search Result " + sym.toString(2));
+            result_syms.add(sym);
+          }
        }
     }
 }

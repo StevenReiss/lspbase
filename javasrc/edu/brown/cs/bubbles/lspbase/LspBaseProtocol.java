@@ -392,6 +392,10 @@ void processReply(int id,Object cnts)
       JSONObject jcnts = (JSONObject) cnts;
       s = jcnts.toString(2);
     }
+   else if (cnts instanceof JSONArray) {
+      JSONArray jcnts = (JSONArray) cnts;
+      s = jcnts.toString(2);
+    }
    LspLog.logD("Reply: " + id + " " + (lsp != null) + " " + s);
    
    if (lsp != null) {

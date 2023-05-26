@@ -37,7 +37,7 @@ class LspBaseUtil implements LspBaseConstants
 /*                                                                              */
 /********************************************************************************/
 
-private static final String [] SymbolKinds = {
+static final String [] SymbolKinds = {
    "None", "File", "Module", "Namespace", "Package",
    "Class", "Method", "Property", "Field", "Constructor",
    "Enum", "Interface", "Function", "Variable", "Constant",
