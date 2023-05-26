@@ -66,7 +66,7 @@ private static final String PROJECTS_FILE = ".projects";
 LspBaseProjectManager(LspBaseMain nm) throws LspBaseException
 {
    lsp_main = nm;
-   
+
    File ws = nm.getWorkSpaceDirectory();
 
    if (!ws.exists()) ws.mkdirs();
@@ -140,7 +140,7 @@ private void forAllProjects(String proj,Consumer<LspBaseProject> f)
 }
 
 
-LspBasePreferences getSystemPreferences()	
+LspBasePreferences getSystemPreferences()
 {
    return system_preferences;
 }
@@ -153,24 +153,24 @@ LspBaseFile findFile(String proj,String file)
    if (file.startsWith("file:/")) {
       int j = 0;
       for (int i = 5; i < file.length(); ++i) {
-         if (file.charAt(i) == '/') j = i;
-         else break;
+	 if (file.charAt(i) == '/') j = i;
+	 else break;
        }
       file = file.substring(j);
     }
    if (proj != null) {
       try {
-         LspBaseProject p = findProject(proj);
-         return p.findFile(file);
+	 LspBaseProject p = findProject(proj);
+	 return p.findFile(file);
        }
       catch (LspBaseException e) {
-         return null;
+	 return null;
        }
     }
    else {
       for (LspBaseProject np : all_projects.values()) {
-         LspBaseFile lbf = np.findFile(file);
-         if (lbf != null) return lbf;
+	 LspBaseFile lbf = np.findFile(file);
+	 if (lbf != null) return lbf;
        }
     }
    return null;
@@ -232,16 +232,16 @@ void handleCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
 	 handleSetPreferences(proj,pxml,xw);
 	 break;
       case "COMMIT" :
-         handleCommit(proj,IvyXml.getAttrString(xml,"BID","*"),
-               IvyXml.getAttrBool(xml,"REFRESH",false),
-               IvyXml.getAttrBool(xml,"SAVE",false),
-               LspBaseMonitor.getElements(xml,"FILE"),xw);
-          break;
+	 handleCommit(proj,IvyXml.getAttrString(xml,"BID","*"),
+	       IvyXml.getAttrBool(xml,"REFRESH",false),
+	       IvyXml.getAttrBool(xml,"SAVE",false),
+	       LspBaseMonitor.getElements(xml,"FILE"),xw);
+	  break;
       case "EDITPARAM" :
-         handleEditParam(proj,IvyXml.getAttrString(xml,"BID","*"),
-               IvyXml.getAttrString(xml,"NAME"),
-               IvyXml.getAttrString(xml,"VALUE"));
-         break;
+	 handleEditParam(proj,IvyXml.getAttrString(xml,"BID","*"),
+	       IvyXml.getAttrString(xml,"NAME"),
+	       IvyXml.getAttrString(xml,"VALUE"));
+	 break;
       case "CREATEPROJECT" :
       case "EDITPROJECT" :
       case "CREATEPACKAGE" :
@@ -259,28 +259,28 @@ void handleEditCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
 {
    switch(cmd) {
       case "EDITPARAM" :
-         handleEditParam(proj,IvyXml.getAttrString(xml,"BID","*"),
-               IvyXml.getAttrString(xml,"NAME"),
-               IvyXml.getAttrString(xml,"VALUE"));
-         break;
+	 handleEditParam(proj,IvyXml.getAttrString(xml,"BID","*"),
+	       IvyXml.getAttrString(xml,"NAME"),
+	       IvyXml.getAttrString(xml,"VALUE"));
+	 break;
       case "ELIDESET" :
-         break;
+	 break;
       case "STARTFILE" :
-         handleStartFile(proj,IvyXml.getAttrString(xml,"BID","*"),
-               IvyXml.getAttrString(xml,"FILE"),xw);
-         break;
+	 handleStartFile(proj,IvyXml.getAttrString(xml,"BID","*"),
+	       IvyXml.getAttrString(xml,"FILE"),xw);
+	 break;
       case "COMMIT" :
-         handleCommit(proj,IvyXml.getAttrString(xml,"BID","*"),
-               IvyXml.getAttrBool(xml,"REFRESH"),
-               IvyXml.getAttrBool(xml,"SAVE"),
-               LspBaseMonitor.getElements(xml,"FILES"),xw);
-         break;
+	 handleCommit(proj,IvyXml.getAttrString(xml,"BID","*"),
+	       IvyXml.getAttrBool(xml,"REFRESH"),
+	       IvyXml.getAttrBool(xml,"SAVE"),
+	       LspBaseMonitor.getElements(xml,"FILES"),xw);
+	 break;
     }
 }
 
 
 
- 
+
 
 
 /********************************************************************************/
@@ -339,9 +339,9 @@ void handleBuildProject(String proj,boolean clean,boolean full,boolean refresh,I
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      COMMIT command                                                          */
-/*                                                                              */
+/*										*/
+/*	COMMIT command								*/
+/*										*/
 /********************************************************************************/
 
 void handleCommit(String proj,String bid,boolean refresh,boolean save,List<Element> files,IvyXmlWriter xw)
@@ -349,7 +349,7 @@ void handleCommit(String proj,String bid,boolean refresh,boolean save,List<Eleme
 {
    xw.begin("COMMIT");
    forAllProjects(proj,
-         (LspBaseProject p) -> p.commit(bid,refresh,save,files,xw));
+	 (LspBaseProject p) -> p.commit(bid,refresh,save,files,xw));
    xw.end("COMMIT");
 }
 
@@ -357,16 +357,16 @@ void handleCommit(String proj,String bid,boolean refresh,boolean save,List<Eleme
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Editing commands                                                        */
-/*                                                                              */
+/*										*/
+/*	Editing commands							*/
+/*										*/
 /********************************************************************************/
 
 void handleEditParam(String proj,String bid,String name,String value)
    throws LspBaseException
 {
    forAllProjects(proj,
-         (LspBaseProject p) -> p.handleEditParameter(bid,name,value));
+	 (LspBaseProject p) -> p.handleEditParameter(bid,name,value));
 }
 
 
@@ -393,7 +393,7 @@ void handleGetAllNames(String proj,String bid,Set<String> files,String bkg,IvyXm
    throws LspBaseException
 {
    NameThread nt = new NameThread(bid,bkg,proj,xw);
-   
+
    if (bkg != null) nt.start();
    else nt.compute();
 }
@@ -418,55 +418,55 @@ private class NameThread extends Thread implements LspNamer {
       xml_writer = (nid == null ? xw : null);
     }
 
-   
+
    @Override public void handleNames(LspBaseProject project,LspBaseFile file,JSONArray names) {
-      if (xml_writer == null) { 
-         xml_writer = lsp_main.beginMessage("NAMES",bump_id);
-         xml_writer.field("NID",name_id);
+      if (xml_writer == null) {
+	 xml_writer = lsp_main.beginMessage("NAMES",bump_id);
+	 xml_writer.field("NID",name_id);
        }
-        
+
       xml_writer.begin("FILE");
       xml_writer.textElement("PATH",file.getPath());
       for (int i = 0; i < names.length(); ++i) {
-         LspBaseUtil.outputLspSymbol(project,file,names.getJSONObject(i),xml_writer);
+	 LspBaseUtil.outputLspSymbol(project,file,names.getJSONObject(i),xml_writer);
        }
       xml_writer.end("FILE");
-      
+
       if (name_id != null) {
-         if (xml_writer.getLength() > 1000000) {
-            lsp_main.finishMessageWait(xml_writer,15000);
-            LspLog.logD("OUTPUT NAMES: " + xml_writer.toString());
-            xml_writer = null;
-          }
+	 if (xml_writer.getLength() > 1000000) {
+	    lsp_main.finishMessageWait(xml_writer,15000);
+	    LspLog.logD("OUTPUT NAMES: " + xml_writer.toString());
+	    xml_writer = null;
+	  }
        }
     }
-   
-   
+
+
    @Override public void run() {
       LspLog.logD("START NAMES FOR " + name_id);
       try {
-         compute();
+	 compute();
        }
       catch (LspBaseException e) {
-         LspLog.logE("Problem handling names",e);
+	 LspLog.logE("Problem handling names",e);
        }
       if (name_id != null && xml_writer != null) {
-         lsp_main.finishMessageWait(xml_writer);
-         xml_writer = null;
+	 lsp_main.finishMessageWait(xml_writer);
+	 xml_writer = null;
        }
       if (name_id != null) {
-         LspLog.logD("FINISH NAMES FOR " + name_id);
-         IvyXmlWriter xw =  lsp_main.beginMessage("ENDNAMES",bump_id);
-         xw.field("NID",name_id);
-         lsp_main.finishMessage(xw);
+	 LspLog.logD("FINISH NAMES FOR " + name_id);
+	 IvyXmlWriter xw =  lsp_main.beginMessage("ENDNAMES",bump_id);
+	 xw.field("NID",name_id);
+	 lsp_main.finishMessage(xw);
        }
     }
-   
+
     void compute() throws LspBaseException {
       forAllProjects(for_project,(LspBaseProject np) -> np.getAllNames(this));
     }
-   
-   
+
+
 }	// end of inner class NameThread
 
 
@@ -495,7 +495,7 @@ void handlePatternSearch(String proj,String pat,String sf,
 /********************************************************************************/
 
 void handlePreferences(String proj,IvyXmlWriter xw)
-   throws LspBaseException
+   throws LspBaseException					
 {
    LspBasePreferences opts;
    if (proj == null) {

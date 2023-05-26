@@ -1,21 +1,21 @@
 /********************************************************************************/
-/*                                                                              */
-/*              LspBaseProject.java                                             */
-/*                                                                              */
-/*      description of class                                                    */
-/*                                                                              */
+/*										*/
+/*		LspBaseProject.java						*/
+/*										*/
+/*	description of class							*/
+/*										*/
 /********************************************************************************/
-/*      Copyright 2011 Brown University -- Steven P. Reiss                    */
+/*	Copyright 2011 Brown University -- Steven P. Reiss		      */
 /*********************************************************************************
- *  Copyright 2011, Brown University, Providence, RI.                            *
- *                                                                               *
- *                        All Rights Reserved                                    *
- *                                                                               *
- * This program and the accompanying materials are made available under the      *
+ *  Copyright 2011, Brown University, Providence, RI.				 *
+ *										 *
+ *			  All Rights Reserved					 *
+ *										 *
+ * This program and the accompanying materials are made available under the	 *
  * terms of the Eclipse Public License v1.0 which accompanies this distribution, *
- * and is available at                                                           *
- *      http://www.eclipse.org/legal/epl-v10.html                                *
- *                                                                               *
+ * and is available at								 *
+ *	http://www.eclipse.org/legal/epl-v10.html				 *
+ *										 *
  ********************************************************************************/
 
 
@@ -47,20 +47,20 @@ class LspBaseProject implements LspBaseConstants
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Private Storage                                                         */
-/*                                                                              */
+/*										*/
+/*	Private Storage 							*/
+/*										*/
 /********************************************************************************/
 
-private LspBaseMain     lsp_base;
+private LspBaseMain	lsp_base;
 private LspBaseProjectManager project_manager;
-private String          project_name;
-private String          project_language;
-private File            base_directory;
+private String		project_name;
+private String		project_language;
+private File		base_directory;
 private List<LspBasePathSpec> project_paths;
 private Map<String,LspBaseFile> file_map;
 private List<LspBaseFile> project_files;
-private boolean         is_open;
+private boolean 	is_open;
 private LspBaseProtocol use_protocol;
 private LspBasePreferences project_preferences;
 private Map<String,EditParameters> edit_parameters;
@@ -68,12 +68,12 @@ private Map<String,EditParameters> edit_parameters;
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Constructors                                                            */
-/*                                                                              */
+/*										*/
+/*	Constructors								*/
+/*										*/
 /********************************************************************************/
 
-LspBaseProject(LspBaseMain lm,LspBaseProjectManager pm,String name,File base) 
+LspBaseProject(LspBaseMain lm,LspBaseProjectManager pm,String name,File base)
 {
    lsp_base = lm;
    project_manager = pm;
@@ -85,10 +85,10 @@ LspBaseProject(LspBaseMain lm,LspBaseProjectManager pm,String name,File base)
    file_map = new HashMap<>();
    project_preferences = new LspBasePreferences(pm.getSystemPreferences());
    edit_parameters = new HashMap<>();
-   
+
    File f = new File(base_directory,".bubbles");
    if (!f.exists()) f.mkdir();
-   
+
    File f1 = new File(base_directory,PROJECT_DATA_FILE);
    Element xml = IvyXml.loadXmlFromFile(f1);
    if (xml != null) {
@@ -100,7 +100,7 @@ LspBaseProject(LspBaseMain lm,LspBaseProjectManager pm,String name,File base)
       for (Element fe : IvyXml.children(xml,"FILE")) {
 	 String nm = IvyXml.getTextElement(fe,"NAME");
 	 File fs = new File(nm);
-         addLspFile(fs,false);
+	 addLspFile(fs,false);
        }
       project_preferences.loadXml(xml);
     }
@@ -112,22 +112,22 @@ LspBaseProject(LspBaseMain lm,LspBaseProjectManager pm,String name,File base)
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Access methods                                                          */
-/*                                                                              */
+/*										*/
+/*	Access methods								*/
+/*										*/
 /********************************************************************************/
 
-String getName() 			        { return project_name; }
-String getLanguage()                            { return project_language; }
-LspBaseProtocol getProtocol()                   { return use_protocol; }
+String getName()				{ return project_name; }
+String getLanguage()				{ return project_language; }
+LspBaseProtocol getProtocol()			{ return use_protocol; }
 File getBasePath()				{ return base_directory; }
 // NobasePreferences getPreferences()		{ return nobase_prefs; }
-boolean isOpen() 			        { return is_open; }
-boolean exists() 			        { return base_directory.exists(); }
-LspBaseProject [] getReferencedProjects()       { return new LspBaseProject[0]; }
-LspBaseProject [] getReferencingProjects()      { return new LspBaseProject[0]; }
+boolean isOpen()				{ return is_open; }
+boolean exists()				{ return base_directory.exists(); }
+LspBaseProject [] getReferencedProjects()	{ return new LspBaseProject[0]; }
+LspBaseProject [] getReferencingProjects()	{ return new LspBaseProject[0]; }
 
-LspBasePreferences getPreferences()             { return project_preferences; }
+LspBasePreferences getPreferences()		{ return project_preferences; }
 
 LspBaseFile findFile(String path)
 {
@@ -135,8 +135,8 @@ LspBaseFile findFile(String path)
    if (path.startsWith("file:/")) {
       int j = 0;
       for (int i = 5; i < path.length(); ++i) {
-         if (path.charAt(i) == '/') j = i;
-         else break;
+	 if (path.charAt(i) == '/') j = i;
+	 else break;
        }
       path = path.substring(j);
     }
@@ -151,51 +151,51 @@ LspBaseFile findFile(File f)
 String getRelativeFile(LspBaseFile f)
 {
    String p0 = IvyFile.getCanonicalPath(f.getFile());
-   
+
    for (LspBasePathSpec ps : project_paths) {
       if (ps.isUser() && !ps.isExclude()) {
-         File dir = ps.getFile();
-         File dir1 = getUserSourceDirectory(dir);
-         if (dir1 == null) continue;
-         String p1 = IvyFile.getCanonicalPath(dir1);
-         if (p0.startsWith(p1)) {
-            String p2 = p0.substring(p1.length()+1);
-            return p2;
-          }
+	 File dir = ps.getFile();
+	 File dir1 = getUserSourceDirectory(dir);
+	 if (dir1 == null) continue;
+	 String p1 = IvyFile.getCanonicalPath(dir1);
+	 if (p0.startsWith(p1)) {
+	    String p2 = p0.substring(p1.length()+1);
+	    return p2;
+	  }
        }
     }
-      
+
    return null;
 }
 
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Open methods                                                            */
-/*                                                                              */
+/*										*/
+/*	Open methods								*/
+/*										*/
 /********************************************************************************/
 
 void open()
 {
    if (is_open) return;
-   
+
    if (use_protocol == null) {
       use_protocol = lsp_base.findProtocol(base_directory,project_language,project_paths);
     }
-   
+
    for (LspBasePathSpec ps : project_paths) {
       if (ps.isUser() && !ps.isExclude()) {
-         File dir = ps.getFile();
-         File dir1 = getUserSourceDirectory(dir);
-         if (dir1 != null) {
-            findFiles(null,dir1,false);
-          }
+	 File dir = ps.getFile();
+	 File dir1 = getUserSourceDirectory(dir);
+	 if (dir1 != null) {
+	    findFiles(null,dir1,false);
+	  }
        }
     }
-   
+
    use_protocol.initialize();
-   
+
    is_open = true;
 }
 
@@ -208,10 +208,10 @@ private File getUserSourceDirectory(File dir)
       File fyaml = new File(f1,"pubspec.yaml");
       File flib = new File(f1,"lib");
       if (fyaml.exists() && flib.exists() && flib.isDirectory()) {
-         return flib;
+	 return flib;
        }
     }
-   
+
    return null;
 }
 
@@ -222,26 +222,26 @@ protected void findFiles(String pfx,File f,boolean reload)
    boolean nest = true;
    for (LspBasePathSpec ps : project_paths) {
       if (!ps.isUser() || ps.isExclude()) {
-         if (ps.match(f)) return;
+	 if (ps.match(f)) return;
        }
       if (!ps.isNested()) {
-         if (ps.match(f)) nest = false;
+	 if (ps.match(f)) nest = false;
        }
     }
-   
+
    FileFilter filter = lsp_base.getLanguageData(project_language).getSourceFilter();
-   
+
    if (f.isDirectory()) {
       File [] fls = f.listFiles(filter);
       String npfx = null;
       if (pfx != null) npfx = pfx + "." + f.getName();
       for (File f1 : fls) {
-         if (!nest && f1.isDirectory()) continue;
-         findFiles(npfx,f1,reload);
+	 if (!nest && f1.isDirectory()) continue;
+	 findFiles(npfx,f1,reload);
        }
       return;
     }
-   
+
    if (!filter.accept(f)) return;
    addLspFile(f,reload);
 }
@@ -254,9 +254,9 @@ private LspBaseFile addLspFile(File file,boolean reload)
       if (reload) lbf0.reload();
       return lbf0;
     }
-   
+
    LspLog.logD("Add File " + file.getAbsolutePath());
-   
+
    LspBaseFile lbf = new LspBaseFile(this,file,project_language);
    project_files.add(lbf);
    file_map.put(file.getAbsolutePath(),lbf);
@@ -264,7 +264,7 @@ private LspBaseFile addLspFile(File file,boolean reload)
       file_map.put(file.getCanonicalPath(),lbf);
     }
    catch (IOException e) { }
-   
+
    return lbf;
 }
 
@@ -272,9 +272,9 @@ private LspBaseFile addLspFile(File file,boolean reload)
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Names methods                                                           */
-/*                                                                              */
+/*										*/
+/*	Names methods								*/
+/*										*/
 /********************************************************************************/
 
 void getAllNames(LspNamer namer)
@@ -282,8 +282,8 @@ void getAllNames(LspNamer namer)
    for (LspBaseFile lbf : project_files) {
       JSONObject tdi = createJson("uri",lbf.getUri());
       use_protocol.sendMessage("textDocument/documentSymbol",
-            new NameHandler(namer,this,lbf),
-            "textDocument",tdi);
+	    new NameHandler(namer,this,lbf),
+	    "textDocument",tdi);
     }
 }
 
@@ -293,50 +293,50 @@ private class NameHandler implements LspResponder {
    private LspBaseProject for_project;
    private LspBaseFile for_file;
    private LspNamer use_namer;
-   
+
    NameHandler(LspNamer namer,LspBaseProject project,LspBaseFile file) {
       for_project = project;
       for_file = file;
       use_namer = namer;
     }
-   
-   
+
+
    @Override public void handleResponse(Object resp,JSONObject err) {
       if (err != null) return;
       if (resp == null) return;
       JSONArray jarr = (JSONArray) resp;
       use_namer.handleNames(for_project,for_file,jarr);
     }
-   
-}       // end of inner class NameHandler
+
+}	// end of inner class NameHandler
 
 
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Build methods                                                           */
-/*                                                                              */
+/*										*/
+/*	Build methods								*/
+/*										*/
 /********************************************************************************/
 
 void commit(String bid,boolean refresh,boolean save,List<Element> files,IvyXmlWriter xw)
 {
    if (files == null || files.size() == 0) {
       for (LspBaseFile lbf : project_files) {
-         if (refresh || !save || lbf.hasChanged()) {
-            commitFile(lbf,bid,refresh,save,xw);
-          }
+	 if (refresh || !save || lbf.hasChanged()) {
+	    commitFile(lbf,bid,refresh,save,xw);
+	  }
        }
     }
    else {
       for (Element e : files) {
-         String fnm = IvyXml.getAttrString(e,"NAME");
-         LspBaseFile lbf = findFile(fnm);
-         if (lbf != null) {
-            boolean r = IvyXml.getAttrBool(e,"REFRESH",refresh);
-            boolean s = IvyXml.getAttrBool(e,"SAVE",save);
-            commitFile(lbf,bid,r,s,xw);
-          }
+	 String fnm = IvyXml.getAttrString(e,"NAME");
+	 LspBaseFile lbf = findFile(fnm);
+	 if (lbf != null) {
+	    boolean r = IvyXml.getAttrBool(e,"REFRESH",refresh);
+	    boolean s = IvyXml.getAttrBool(e,"SAVE",save);
+	    commitFile(lbf,bid,r,s,xw);
+	  }
        }
     }
 }
@@ -345,16 +345,16 @@ void commit(String bid,boolean refresh,boolean save,List<Element> files,IvyXmlWr
 private void commitFile(LspBaseFile lbf,String bid,boolean refresh,boolean save,IvyXmlWriter xw)
 {
    boolean upd = false;
-   
+
    lbf.lockFile(bid);
    try {
       xw.begin("FILE");
       xw.field("NAME",lbf.getPath());
       try {
-         upd = lbf.commit(refresh,save);
+	 upd = lbf.commit(refresh,save);
        }
       catch (Throwable t) {
-         xw.field("ERROR",t.toString());
+	 xw.field("ERROR",t.toString());
        }
       xw.end("FILE");
     }
@@ -363,8 +363,8 @@ private void commitFile(LspBaseFile lbf,String bid,boolean refresh,boolean save,
     }
    if (upd) {
       // start autocompile
-    } 
-   
+    }
+
 }
 
 
@@ -374,77 +374,76 @@ void build(boolean refresh,boolean reload)
       open();
       return;
     }
-   
+
    Set<LspBaseFile> oldfiles = null;
    if (refresh) {
       oldfiles = new HashSet<>(project_files);
       if (reload) {
-         project_files.clear();
+	 project_files.clear();
        }
     }
-   
+
    for (LspBasePathSpec ps : project_paths) {
       if (ps.isUser() && !ps.isExclude()) {
-         File dir = ps.getFile();
-         findFiles(null,dir,reload);
+	 File dir = ps.getFile();
+	 findFiles(null,dir,reload);
        }
     }
-   
+
 }
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Search methods                                                          */
-/*                                                                              */
+/*										*/
+/*	Search methods								*/
+/*										*/
 /********************************************************************************/
 
 void patternSearch(String pat,String typ,boolean defs,boolean refs,boolean system,IvyXmlWriter xw)
-      throws LspBaseException
 {
    if (pat.startsWith("null.")) pat = pat.substring(5);
    String fpat = pat;
    int idx = pat.indexOf("(");
    if (idx >= 0) fpat = pat.substring(0,idx);
-   
+
    // TYPE PATTERNS: [qualification '.']typeName ['<' typeArguments '>']
-   //                [moduleName1[,moduleName2,..]]/[qualification '.']typeName ['<' typeArguments '>']
+   //		     [moduleName1[,moduleName2,..]]/[qualification '.']typeName ['<' typeArguments '>']
    // METHOD PATTERNS:
-   //      [declaringType '.'] ['<' typeArguments '>'] methodName ['(' parameterTypes ')'] [returnType] 
+   //	   [declaringType '.'] ['<' typeArguments '>'] methodName ['(' parameterTypes ')'] [returnType]
    // CONSTRUCTOR PATTERNS:
-   //     ['<' typeArguments '>'] [declaringQualification '.'] typeName ['(' parameterTypes ')']
+   //	  ['<' typeArguments '>'] [declaringQualification '.'] typeName ['(' parameterTypes ')']
    // FIELD PATTERNS:
-   //     [declaringType '.'] fieldName [fieldType]
+   //	  [declaringType '.'] fieldName [fieldType]
    // PACKAGE PATTERNS:
-   //      packageNameSegment {'.' packageNameSegment}
-   // Patterns can include '*' for any string 
-   
+   //	   packageNameSegment {'.' packageNameSegment}
+   // Patterns can include '*' for any string
+
    // LSP patterns: match if every character of the pattern occurs in the string in the
-   //   same order as in the pattern, and the first letters of separate words in pattern
-   //   are aligned with words in the string.  Matching is case-insensitive, but case 
-   //   matches get higher scores
-   
+   //	same order as in the pattern, and the first letters of separate words in pattern
+   //	are aligned with words in the string.  Matching is case-insensitive, but case
+   //	matches get higher scores
+
    // Also, LSP workspace/symbol only matches on name, not other fields
-   
+
    // From the pattern, based on type of pattern, create:
-   //           mpat :: simple string to match against (remove *, only consider name)
-   //           cpat :: pattern for container
-   //           fpat :: pattern for file (actually name of file if known)
-   //           tpat :: return type/fieldType -- might not be available
-   
-   
+   //		mpat :: simple string to match against (remove *, only consider name)
+   //		cpat :: pattern for container
+   //		fpat :: pattern for file (actually name of file if known)
+   //		tpat :: return type/fieldType -- might not be available
+
+
    //TODO: pattern from bubbles and pattern to lsp are different -- create simplified
-   //   pattern for lsp and do actual matching of pattern in DeclSearchResult
-   //   might need to get file id from pattern as well
-   
+   //	pattern for lsp and do actual matching of pattern in DeclSearchResult
+   //	might need to get file id from pattern as well
+
    DeclSearchResult sr = new DeclSearchResult(pat,typ,system);
    use_protocol.sendMessage("workspace/symbol",
-         (Object data,JSONObject err) -> sr.addResult((JSONArray) data,err),
-         "query",fpat);
-   
+	 (Object data,JSONObject err) -> sr.addResult((JSONArray) data,err),
+	 "query",fpat);
+
    List<JSONObject> rslts = sr.getResults();
    if (rslts.isEmpty()) return;
-  
+
    if (defs && !refs) {
       // output results
     }
@@ -453,95 +452,95 @@ void patternSearch(String pat,String typ,boolean defs,boolean refs,boolean syste
       // For each definition, find references and add those to list
       // then output results -- or use includeDeclaration flag
     }
-   
+
 }
 
 
 
 private class DeclSearchResult {
-   
+
    private String name_pattern;
    private Set<Integer> valid_types;
    private boolean allow_system;
    private List<JSONObject> result_syms;
-   
+
    DeclSearchResult(String pat,String typ,boolean system) {
       // possible do all pattern computation here and provide call to get search pattern
       // move this to a separate file
       // name_pattern: should be REGEX for name
       // cpat_pattern: REGEX for container
       // file_pattern:
-      
+
       name_pattern = pat;
       allow_system = system;
       valid_types = null;
       switch (typ) {
-         case "CONSTRUCTOR" :
-            valid_types = Set.of(9);
-            break;
-         case "METHOD" :
-            valid_types = Set.of(6,12,21);
-            break;
-         case "FIELD" :
-            valid_types = Set.of(8,13,14,20,22);
-            break;
-         case "TYPE" :
-            valid_types = Set.of(5,7,10,11,23);
-            break;
-         case "PACKAGE" :
-            valid_types = Set.of(2,3,4);
-            break;
-         case "MODULE" :
-            valid_types = Set.of(2);
-            break;
-         case "CLASS" :
-            valid_types = Set.of(5);
-            break;
-         case "INTERFACE" :
-            valid_types = Set.of(11);
-            break;
-         case "ENUM" :
-            valid_types = Set.of(10);
-            break;
-         case "CLASS_AND_ENUM" :
-            valid_types = Set.of(5,10);
-            break;
-         case "CLASS_AND_INTERFACE" :
-            valid_types = Set.of(5,11);
-            break;
-         case "ANNOTATION" :
-            valid_types = Set.of(7);
-            break;
-         default :
-            LspLog.logE("Unknown search type " + typ);
-            break;
+	 case "CONSTRUCTOR" :
+	    valid_types = Set.of(9);
+	    break;
+	 case "METHOD" :
+	    valid_types = Set.of(6,12,21);
+	    break;
+	 case "FIELD" :
+	    valid_types = Set.of(8,13,14,20,22);
+	    break;
+	 case "TYPE" :
+	    valid_types = Set.of(5,7,10,11,23);
+	    break;
+	 case "PACKAGE" :
+	    valid_types = Set.of(2,3,4);
+	    break;
+	 case "MODULE" :
+	    valid_types = Set.of(2);
+	    break;
+	 case "CLASS" :
+	    valid_types = Set.of(5);
+	    break;
+	 case "INTERFACE" :
+	    valid_types = Set.of(11);
+	    break;
+	 case "ENUM" :
+	    valid_types = Set.of(10);
+	    break;
+	 case "CLASS_AND_ENUM" :
+	    valid_types = Set.of(5,10);
+	    break;
+	 case "CLASS_AND_INTERFACE" :
+	    valid_types = Set.of(5,11);
+	    break;
+	 case "ANNOTATION" :
+	    valid_types = Set.of(7);
+	    break;
+	 default :
+	    LspLog.logE("Unknown search type " + typ);
+	    break;
        }
       result_syms = new ArrayList<>();
     }
-   
-   List<JSONObject> getResults()                        { return result_syms; }
-   
-   void addResult(JSONArray syms,JSONObject err) { 
+
+   List<JSONObject> getResults()			{ return result_syms; }
+
+   void addResult(JSONArray syms,JSONObject err) {
       if (err != null) {
-         LspLog.logD("Search Result Error " + err.toString(2));
+	 LspLog.logD("Search Result Error " + err.toString(2));
        }
       else {
-         for (int i = 0; i < syms.length(); ++i) {
-            JSONObject sym = syms.getJSONObject(i);
-            String nm = sym.getString("name");
-            if (!nm.startsWith(name_pattern)) continue;          // need better match
-            int kind = sym.getInt("kind");
-            if (valid_types != null && !valid_types.contains(kind)) continue;
-            String container = sym.optString("containerName");
-            JSONObject loc = sym.getJSONObject("location");
-            String uri = loc.getString("uri");
-            if (!allow_system) {
-               LspBaseFile lbf = findFile(uri);
-               if (lbf == null) continue;
-             }
-            LspLog.logD("Search Result " + sym.toString(2));
-            result_syms.add(sym);
-          }
+	 for (int i = 0; i < syms.length(); ++i) {
+	    JSONObject sym = syms.getJSONObject(i);
+	    String nm = sym.getString("name");
+	    if (!nm.startsWith(name_pattern)) continue; 	 // need better match
+	    int kind = sym.getInt("kind");
+	    if (valid_types != null && !valid_types.contains(kind)) continue;
+	    String container = sym.optString("containerName");
+	    JSONObject loc = sym.getJSONObject("location");
+	    String uri = loc.getString("uri");
+	    if (!allow_system) {
+	       LspBaseFile lbf = findFile(uri);
+	       if (lbf == null) continue;
+	     }
+	    LspLog.logD("Search Result " + sym.toString(2));
+	    result_syms.add(sym);
+	  }
        }
     }
 }
@@ -549,16 +548,16 @@ private class DeclSearchResult {
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      File methods                                                            */
-/*                                                                              */
+/*										*/
+/*	File methods								*/
+/*										*/
 /********************************************************************************/
 
 void openFile(LspBaseFile lbf)
 {
    use_protocol.sendMessage("textDocument/didOpen",this::openFileResponse,
-         "textDocument",lbf.getTextDocumentItem());
-   
+	 "textDocument",lbf.getTextDocumentItem());
+
 }
 
 
@@ -575,19 +574,19 @@ void editFile(LspBaseFile lbf,List<LspBaseEdit> edits)
       LineCol lc0 = lbf.mapOffsetToLineColumn(ed.getOffset());
       LineCol lc1 = lbf.mapOffsetToLineColumn(ed.getOffset() + ed.getLength());
       JSONObject rng = createJson("start",createJson("line",lc0.getLine(),"character",lc0.getColumn()),
-            "end",createJson("line",lc1.getLine(),"character",lc1.getColumn()));
+	    "end",createJson("line",lc1.getLine(),"character",lc1.getColumn()));
       JSONObject chng = createJson("range",rng,"text",ed.getText());
       changes.put(chng);
     }
    use_protocol.sendMessage("textDocument/didChange",null,
-         "textDocument",lbf.getTextDocumentId(),"contentChanges",changes);
+	 "textDocument",lbf.getTextDocumentId(),"contentChanges",changes);
 }
 
 void willSaveFile(LspBaseFile lbf)
 {
    use_protocol.sendMessage("textDocument/willSave",null,
-         "textDocument",lbf.getTextDocumentId(),"reason",1);
-         
+	 "textDocument",lbf.getTextDocumentId(),"reason",1);
+	
 }
 
 
@@ -595,14 +594,14 @@ void willSaveFile(LspBaseFile lbf)
 void saveFile(LspBaseFile lbf)
 {
    use_protocol.sendMessage("textDocument/didSave",null,
-         "textDocument",lbf.getTextDocumentId());
+	 "textDocument",lbf.getTextDocumentId());
 }
 
 
 void closeFile(LspBaseFile lbf)
 {
    use_protocol.sendMessage("textDOcument/didClose",null,
-         "textDocument",lbf.getTextDocumentId());
+	 "textDocument",lbf.getTextDocumentId());
 }
 
 
@@ -652,13 +651,13 @@ void outputXml(IvyXmlWriter xw)
 void outputProject(boolean files,boolean paths,boolean clss,boolean opts,IvyXmlWriter xw)
 {
    if (xw == null) return;
-   
+
    xw.begin("PROJECT");
    xw.field("NAME",project_name);
    xw.field("LANGUAGE",project_language);
    xw.field("PATH",base_directory.getPath());
    xw.field("WORKSPACE",project_manager.getWorkSpaceDirectory().getPath());
-   
+
    if (paths) {
       xw.begin("CLASSPATH");
       for (LspBasePathSpec ps : project_paths) {
@@ -671,9 +670,9 @@ void outputProject(boolean files,boolean paths,boolean clss,boolean opts,IvyXmlW
 	 outputFile(fd,xw);
        }
     }
-   
+
 // if (opts) nobase_prefs.outputXml(xw);
-   
+
    xw.end("PROJECT");
 }
 
@@ -690,9 +689,9 @@ private void outputFile(LspBaseFile fd,IvyXmlWriter xw)
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Edit parameters                                                         */
-/*                                                                              */
+/*										*/
+/*	Edit parameters 							*/
+/*										*/
 /********************************************************************************/
 
 void handleEditParameter(String bid,String name,String value)
@@ -709,8 +708,8 @@ private EditParameters getParameters(String id)
    synchronized (edit_parameters) {
       EditParameters ep = edit_parameters.get(id);
       if (ep == null) {
-         ep = new EditParameters();
-         edit_parameters.put(id,ep);
+	 ep = new EditParameters();
+	 edit_parameters.put(id,ep);
        }
       return ep;
     }
@@ -722,32 +721,32 @@ private static class EditParameters {
 
    private int delay_time;
    private boolean auto_elide;
-   
+
    EditParameters() {
       delay_time = 250;
       auto_elide = false;
     }
-   
-   int getDelayTime()           { return delay_time; }
-   boolean getAutoElide()       { return auto_elide; }
-   
+
+   int getDelayTime()		{ return delay_time; }
+   boolean getAutoElide()	{ return auto_elide; }
+
    void setParameter(String name,String value) {
       if (name.equals("AUTOELIDE")) {
-         auto_elide = Boolean.parseBoolean(value);
+	 auto_elide = Boolean.parseBoolean(value);
        }
       else if (name.equals("ELIDEDELAY")) {
-         delay_time = Integer.parseInt(value);
+	 delay_time = Integer.parseInt(value);
        }
     }
 
-}       // end of inner class EditParamters
+}	// end of inner class EditParamters
 
 
 
 
 
 
-}       // end of class LspBaseProject
+}	// end of class LspBaseProject
 
 
 
