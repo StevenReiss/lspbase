@@ -138,6 +138,27 @@ LspBaseFile findFile(File f)
    return findFile(f.getAbsolutePath());
 }
 
+String getRelativeFile(LspBaseFile f)
+{
+   String p0 = IvyFile.getCanonicalPath(f.getFile());
+   
+   for (LspBasePathSpec ps : project_paths) {
+      if (ps.isUser() && !ps.isExclude()) {
+         File dir = ps.getFile();
+         File dir1 = getUserSourceDirectory(dir);
+         if (dir1 == null) continue;
+         String p1 = IvyFile.getCanonicalPath(dir1);
+         if (p0.startsWith(p1)) {
+            String p2 = p0.substring(p1.length()+1);
+            return p2;
+          }
+       }
+    }
+      
+   return null;
+}
+
+
 
 /********************************************************************************/
 /*                                                                              */
@@ -153,17 +174,35 @@ void open()
       use_protocol = lsp_base.findProtocol(base_directory,project_language,project_paths);
     }
    
-   
    for (LspBasePathSpec ps : project_paths) {
       if (ps.isUser() && !ps.isExclude()) {
          File dir = ps.getFile();
-         findFiles(null,dir,false);
+         File dir1 = getUserSourceDirectory(dir);
+         if (dir1 != null) {
+            findFiles(null,dir1,false);
+          }
        }
     }
    
    use_protocol.initialize();
    
    is_open = true;
+}
+
+
+
+
+private File getUserSourceDirectory(File dir)
+{
+   for (File f1 = dir; f1 != null; f1 = f1.getParentFile()) {
+      File fyaml = new File(f1,"pubspec.yaml");
+      File flib = new File(f1,"lib");
+      if (fyaml.exists() && flib.exists() && flib.isDirectory()) {
+         return flib;
+       }
+    }
+   
+   return null;
 }
 
 
@@ -254,6 +293,7 @@ private class NameHandler implements LspResponder {
    
    @Override public void handleResponse(Object resp,JSONObject err) {
       if (err != null) return;
+      if (resp == null) return;
       JSONArray jarr = (JSONArray) resp;
       use_namer.handleNames(for_project,for_file,jarr);
     }
@@ -351,8 +391,28 @@ void build(boolean refresh,boolean reload)
 
 void patternSearch(String pat,String typ,boolean defs,boolean refs,boolean system,IvyXmlWriter xw)
 {
-
+   //TODO: might need to modify pattern here
+   SearchResult sr = new SearchResult();
+   use_protocol.sendMessage("workspace/symbol",
+         (Object data,JSONObject err) -> sr.addResult((JSONArray) data,err),
+         "query",pat);
+   
 }
+
+
+
+private class SearchResult {
+   
+   void addResult(JSONArray syms,JSONObject err) { 
+      if (err != null) {
+         LspLog.logD("Search Result Error " + err.toString(2));
+       }
+      else {
+         LspLog.logD("Search Result " + syms.toString(2));
+       }
+    }
+}
+
 
 
 /********************************************************************************/

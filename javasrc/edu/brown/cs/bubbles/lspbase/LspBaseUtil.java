@@ -99,8 +99,9 @@ private static void outputSymbol(LspBaseProject project,LspBaseFile file,JSONObj
    JSONObject srange = sym.getJSONObject("selectionRange");
    outputRange(true,file,srange,xw);
    
+   String filpfx = project.getRelativeFile(file);
    String qnam = xpfx + sym.getString("name");
-   String hdl = project.getName() + ":" + qnam;
+   String hdl = project.getName() + ":" + filpfx + "#" + qnam;
    String det = sym.optString("detail");
    if (det != null) {
       String xdet = cleanDetail(det);
@@ -178,6 +179,56 @@ private static void outputRange(boolean extended,LspBaseFile file,JSONObject ran
 
 
 
+/********************************************************************************/
+/*                                                                              */
+/*      Output Diagnostic messages                                              */
+/*                                                                              */
+/********************************************************************************/
+
+static void outputDiagnostic(LspBaseFile file,JSONObject diagnostic,IvyXmlWriter xw)
+{
+   xw.begin("PROBLEM");
+   xw.field("PROJECT",file.getProject().getName());
+   xw.field("FILE",file.getPath());
+   xw.field("MESSAGE",diagnostic.getString("message"));
+   Object c = diagnostic.opt("code");
+   if (c != null) xw.field("MSGID",c);
+   Object c1 = diagnostic.opt("codeDescription");
+   if (c1 != null) xw.field("MSGDESCRITPION",c1);
+   String c2 = diagnostic.optString("source");
+   if (c2 != null) xw.field("MSGSOURCE",c2);
+   Object c3 = diagnostic.opt("data");
+   if (c3 != null) xw.field("MSGACTION",c3);
+   
+   outputProblemRange(file,diagnostic.getJSONObject("range"),xw);
+   
+   JSONArray info = diagnostic.optJSONArray("relatedInformation");
+   if (info != null) {
+      for (int i = 0; i < info.length(); ++i) {
+         xw.textElement("ARG",info.get(i).toString());
+       }
+    }
+   xw.end("PROBLEM");
+}
+
+
+
+
+private static void outputProblemRange(LspBaseFile file,JSONObject range,IvyXmlWriter xw)
+{
+   JSONObject start = range.getJSONObject("start");
+   JSONObject end = range.getJSONObject("end");
+   int ln0 = start.getInt("line") + 1;
+   int ch0 = start.getInt("character") + 1;
+   int pos0 = file.mapLineCharToOffset(ln0,ch0);
+   int ln1 = end.getInt("line") + 1;
+   int ch1 = end.getInt("character") + 1;
+   int pos1 = file.mapLineCharToOffset(ln1,ch1);
+   xw.field("LINE",ln0);
+   xw.field("COL", ch0);
+   xw.field("START",pos0);
+   xw.field("END",pos1-1);
+}
 
 }       // end of class LspBaseUtil
 

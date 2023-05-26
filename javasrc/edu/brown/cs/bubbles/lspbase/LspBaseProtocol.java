@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -42,6 +43,7 @@ import org.json.JSONObject;
 import edu.brown.cs.ivy.exec.IvyExec;
 import edu.brown.cs.ivy.exec.IvyExecQuery;
 import edu.brown.cs.ivy.file.IvyFile;
+import edu.brown.cs.ivy.xml.IvyXmlWriter;
 
 class LspBaseProtocol implements LspBaseConstants
 {
@@ -67,6 +69,7 @@ private Map<File,List<LspBasePathSpec>> workspacePathMap;
 
 
 private static AtomicInteger id_counter = new AtomicInteger(10000);
+private static AtomicLong progress_counter = new AtomicLong(1);
 
 
 static final int ParseError = -32700;
@@ -247,7 +250,7 @@ private void handleInit(Object resp,JSONObject err)
 
    JSONObject init = (JSONObject) resp;
    JSONObject scaps = init.getJSONObject("capabilities");
-   for_language.setCapabilities(scaps.toMap());
+   for_language.setCapabilities(scaps);
 }
 
 
@@ -383,6 +386,14 @@ private void dummyHandler(Object resp,JSONObject err)
 void processReply(int id,Object cnts)
 {
    LspResponder lsp = pending_map.get(id);
+
+   String s = (cnts == null ? null : cnts.toString());
+   if (cnts instanceof JSONObject) {
+      JSONObject jcnts = (JSONObject) cnts;
+      s = jcnts.toString(2);
+    }
+   LspLog.logD("Reply: " + id + " " + (lsp != null) + " " + s);
+   
    if (lsp != null) {
       lsp.handleResponse(cnts,null);
     }
@@ -395,6 +406,8 @@ void processReply(int id,Object cnts)
 
 void processError(int id,JSONObject err)
 {
+   LspLog.logE("Process Error " + err.toString(2));
+   
    LspResponder lsp = pending_map.remove(id);
    if (lsp != null) lsp.handleResponse(null,err);
 }
@@ -403,12 +416,14 @@ void processError(int id,JSONObject err)
 void processNotification(Integer id,String method,Object params)
 {
    JSONObject jparams = null;
+ 
    String s = (params == null ? null : params.toString());
    if (params instanceof JSONObject) {
       jparams = (JSONObject) params;
       s = jparams.toString(2);
     }
    LspLog.logD("Notification: " + method + " " + s);
+   
    Object result = null;
    switch (method) {
       case "workspace/configuration" :
@@ -423,7 +438,9 @@ void processNotification(Integer id,String method,Object params)
       case "textDocument/publishDiagnostics" :
          handlePublishDiagnostics(id,jparams);
          break;
-         
+      default :
+         LspLog.logE("Unknown notification " + method);
+         break;
     }
    
    localSendResponse(id,result,null);
@@ -490,14 +507,41 @@ void handleProgress(int id,JSONObject params)
 {
    String token = params.getString("token");
    JSONObject val = params.getJSONObject("value");
+   LspLog.logD("PROGRESS VALUE " + val.toString(2));
+   
    String kind = val.getString("kind");
    String ttl = val.optString("title");
+   
+   LspBaseMain lsp = LspBaseMain.getLspMain();
+   IvyXmlWriter xw = lsp.beginMessage("PROGRESS");
+   xw.field("KIND",kind.toUpperCase());
+   xw.field("TASK",ttl);
+   xw.field("ID",token);
+   xw.field("S",progress_counter.incrementAndGet());
+   lsp.finishMessage(xw);
 }
 
 
 void handlePublishDiagnostics(int id,JSONObject params)
 {
-   //TODO: send errors to bubbles
+   LspBaseMain lsp = LspBaseMain.getLspMain();
+   String uri = params.getString("uri");
+   LspBaseFile lbf = lsp.getProjectManager().findFile(null,uri);
+   if (lbf == null) return;
+   
+   int version = params.optInt("version",-1);
+   JSONArray diags = params.getJSONArray("diagnostics");
+   
+   IvyXmlWriter xw = lsp.beginMessage("FILEERROR");
+   xw.field("PROJECT",lbf.getProject().getName());
+   xw.field("FILE",lbf.getPath());
+   if (version > 0) xw.field("ID",version);
+   xw.begin("MESSAGES");
+   for (int i = 0; i < diags.length(); ++i) {
+      LspBaseUtil.outputDiagnostic(lbf,diags.getJSONObject(i),xw);
+    }
+   xw.end("MESSAGES");
+   lsp.finishMessage(xw);
 }
 
 
@@ -531,13 +575,10 @@ private class MessageReader extends Thread {
                   while (rln < clen) {
                      int mln = message_input.read(buf,rln,clen-rln);
                      rln += mln;
-                     if (rln != clen) {
-                        System.err.println("PARTIAL READ " + new String(buf));
-                      }
                    }
                   String rslt = new String(buf,0,rln);
                   JSONObject jobj = new JSONObject(rslt);
-                  LspLog.logD("Received: " + clen + " " + rln + "::\n" + jobj.toString(2));
+   //             LspLog.logD("Received: " + clen + " " + rln + "::\n" + jobj.toString(2));
                   process(jobj);
                   clen = -1;
                 }
@@ -572,8 +613,6 @@ private class MessageReader extends Thread {
     }
 
    void process(JSONObject reply) {
-      LspLog.logD("PROCESS " + reply.toString(2));
-   
       int id = reply.optInt("id");
       String method = reply.optString("method");
       JSONObject err = reply.optJSONObject("error");
@@ -586,7 +625,7 @@ private class MessageReader extends Thread {
             processNotification(id,method,params);
           }
          else {
-            LspLog.logE("Problem with message");
+            LspLog.logE("Problem with message " + reply.toString(2));
           }
        }
       else {

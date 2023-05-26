@@ -147,6 +147,38 @@ LspBasePreferences getSystemPreferences()
 
 
 
+LspBaseFile findFile(String proj,String file)
+{
+   if (file == null) return null;
+   if (file.startsWith("file:/")) {
+      int j = 0;
+      for (int i = 5; i < file.length(); ++i) {
+         if (file.charAt(i) == '/') j = i;
+         else break;
+       }
+      file = file.substring(j);
+    }
+   if (proj != null) {
+      try {
+         LspBaseProject p = findProject(proj);
+         return p.findFile(file);
+       }
+      catch (LspBaseException e) {
+         return null;
+       }
+    }
+   else {
+      for (LspBaseProject np : all_projects.values()) {
+         LspBaseFile lbf = np.findFile(file);
+         if (lbf != null) return lbf;
+       }
+    }
+   return null;
+}
+
+
+
+
 /********************************************************************************/
 /*										*/
 /*	Command methods 							*/

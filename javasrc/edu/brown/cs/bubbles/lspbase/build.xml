@@ -2,7 +2,7 @@
 
    <property file='../../../../../../build.properties' />
    <property name='PRO' value='/pro' />
-   <property name='BUBBLES' value='/pro/bubbles' />
+   <property name='BUBBLES' value='${PRO}/bubbles' />
    <property name='LSPBASE' value='/pro/lspbase' />
    <available file="${PRO}/ivy" type="dir" property="ivy.present" />
    <target name="init1" if="ivy.present" >

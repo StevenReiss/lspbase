@@ -111,7 +111,7 @@ private void runTest()
    
    start();
    
-   String proj = "darttest";
+   String proj = "alds";
    String ws = "/Users/spr/Lsp/test";
    String fil = "/pro/iot/flutter/alds/lib/main.dart";
    
@@ -247,19 +247,19 @@ private void setupProject()
 {
    String home = System.getProperty("user.home");
    String pfile = home + "/Lsp/test/.projects";
-   String pdir = home + "/Lsp/test/darttest";
+   String pdir = home + "/Lsp/test/alds";
    File pdirf = new File(pdir);
    pdirf.mkdirs();
    File ppfile = new File(pdirf,PROJECT_DATA_FILE);
    
    String pdef = "<PROJECTS>\n" +
-      "<PROJECT NAME='darttest' PATH='/Users/spr/Lsp/test/darttest' />\n" +
-      "</PROJECTS>\n";
-    
-   String tdef = "<PROJECT LANGUAGE='dart' NAME='darttest' BASE='/Users/spr/Lsp/test/darttest'>\n" +
-            "<PATH SOURCE='/pro/iot/flutter/alds/lib' TYPE='INCLUDE' NEST='true' />\n" +
-            "<PATH SOURCE='**/bBACKUP' TYPE='EXCLUDE' />\n" +
-            "</PROJECT>";
+         "<PROJECT NAME='alds' PATH='/Users/spr/Lsp/test/alds' />\n" +
+         "</PROJECTS>\n";
+   
+   String tdef = "<PROJECT LANGUAGE='dart' NAME='alds' BASE='/Users/spr/Lsp/test/alds'>\n" +
+               "<PATH SOURCE='/pro/iot/flutter/alds' TYPE='INCLUDE' NEST='true' />\n" +
+               "<PATH SOURCE='**/bBACKUP' TYPE='EXCLUDE' />\n" +
+               "</PROJECT>";
    
    try (PrintWriter pw = new PrintWriter(new FileWriter(pfile))) {
       pw.println(pdef);
@@ -273,7 +273,7 @@ private void setupProject()
 }
 
 
-   
+
 /********************************************************************************/
 /*										*/
 /*	Run the server methods							*/
@@ -303,25 +303,25 @@ private void start()
 
 
 private class Runner extends Thread {
-
-Runner() {
-   super("LspBaseRunnerThread");
-}
-
-@Override public void run() {
-   try {
-      LspLog.logI("LSPBASETEST: Begin");
-      LspBaseMain.main(new String [] { "-m", "LSPBASETEST", "-ws", "/Users/spr/Lsp/test",
-            "-log", "/pro/lsp/lspbase/src/test.log"});
-      LspLog.logI("LSPBASETEST: Start run");
+   
+   Runner() {
+      super("LspBaseRunnerThread");
     }
-   catch (Throwable t) {
-      LspLog.logE("LSPBASETEST: Error running: " + t);
-      t.printStackTrace();
+   
+   @Override public void run() {
+      try {
+         LspLog.logI("LSPBASETEST: Begin");
+         LspBaseMain.main(new String [] { "-m", "LSPBASETEST", "-ws", "/Users/spr/Lsp/test",
+               "-log", "/pro/lspbase/lspbase/src/test.log"});
+         LspLog.logI("LSPBASETEST: Start run");
+       }
+      catch (Throwable t) {
+         LspLog.logE("LSPBASETEST: Error running: " + t);
+         t.printStackTrace();
+       }
+      LspLog.logI("LSPBASETEST: Finish run");
     }
-   LspLog.logI("LSPBASETEST: Finish run");
-}
-
+   
 }	// end of inner class Runner
 
 
@@ -410,7 +410,7 @@ private static class ReplyHandler extends MintDefaultReply {
    String getResult() {
       return result_value; 
     }
-
+   
 }	// end of inner class ReplyHandler
 
 
@@ -422,32 +422,32 @@ private static class ReplyHandler extends MintDefaultReply {
 /********************************************************************************/
 
 private class MessageHandler implements MintHandler {
-
-@Override public void receive(MintMessage msg,MintArguments args) {
-   LspLog.logI("LSPBASETEST: Message from LSPBASE:");
-   LspLog.logI(msg.getText());
-   LspLog.logI("LSPBASETEST: End of Message");
-   Element xml = msg.getXml();
-   LspBaseTest test = LspBaseTest.this;
-   synchronized (test) {
-      switch (IvyXml.getAttrString(xml,"TYPE")) {
-      case "RUNEVENT" :
-         Element re = IvyXml.getChild(xml,"RUNEVENT");
-         String kind = IvyXml.getAttrString(re,"KIND");
-         if (kind.equals("RESUME") || kind.equals("SUSPEND")) {
-            test.last_runevent = re;
-            test.notifyAll();
+   
+   @Override public void receive(MintMessage msg,MintArguments args) {
+      LspLog.logI("LSPBASETEST: Message from LSPBASE:");
+      LspLog.logI(msg.getText());
+      LspLog.logI("LSPBASETEST: End of Message");
+      Element xml = msg.getXml();
+      LspBaseTest test = LspBaseTest.this;
+      synchronized (test) {
+         switch (IvyXml.getAttrString(xml,"TYPE")) {
+            case "RUNEVENT" :
+               Element re = IvyXml.getChild(xml,"RUNEVENT");
+               String kind = IvyXml.getAttrString(re,"KIND");
+               if (kind.equals("RESUME") || kind.equals("SUSPEND")) {
+                  test.last_runevent = re;
+                  test.notifyAll();
+                }
+               break;
+            case "ENDNAMES" :
+               String nid = IvyXml.getAttrString(xml,"NID");
+               test.last_endnames = nid;
+               break;
           }
-         break;
-      case "ENDNAMES" :
-         String nid = IvyXml.getAttrString(xml,"NID");
-         test.last_endnames = nid;
-         break;
        }
+      msg.replyTo();
     }
-   msg.replyTo();
-}
-
+   
 }	// end of inner class MessageHandler
 
 
