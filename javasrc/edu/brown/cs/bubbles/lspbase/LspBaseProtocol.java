@@ -516,6 +516,9 @@ void handleProgress(int id,JSONObject params)
    String kind = val.getString("kind");
    String ttl = val.optString("title");
    
+   kind = kind.toUpperCase();
+   if (kind.equals("END")) kind = "DONE";
+   
    LspBaseMain lsp = LspBaseMain.getLspMain();
    IvyXmlWriter xw = lsp.beginMessage("PROGRESS");
    xw.field("KIND",kind.toUpperCase());

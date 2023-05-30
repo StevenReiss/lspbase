@@ -147,3 +147,4 @@ ivysrc.jar
 lib/ivy.jar
 **/lspbase.jar
 **/test.log
+.darttra*

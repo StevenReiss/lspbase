@@ -88,16 +88,28 @@ static void outputLspSymbol(LspBaseProject project,
 private static void outputSymbol(LspBaseProject project,LspBaseFile file,JSONObject sym,String pfx,IvyXmlWriter xw)
 {
    String xpfx = (pfx == null ? "" : pfx + ".");
+   JSONObject loc = sym.optJSONObject("location");
+   if (loc != null) {
+      String fileuri = loc.getString("uri");
+      LspBaseFile nfil = project.findFile(fileuri);
+      if (nfil != null) file = nfil;
+    }
+   else { 
+      loc = sym;
+    }
+   
    xw.begin("ITEM");
    xw.field("PROJECT",project.getName());
    xw.field("PATH",file.getPath());
    xw.field("NAME",sym.getString("name"));
    xw.field("TYPE",SymbolKinds[sym.getInt("kind")]);
-   JSONObject range = sym.getJSONObject("range");
+   JSONObject range = loc.getJSONObject("range");
    
    outputRange(false,file,range,xw);
-   JSONObject srange = sym.getJSONObject("selectionRange");
-   outputRange(true,file,srange,xw);
+   JSONObject srange = loc.optJSONObject("selectionRange");
+   if (srange != null) {
+      outputRange(true,file,srange,xw);
+    }
    
    String filpfx = project.getRelativeFile(file);
    String qnam = xpfx + sym.getString("name");
@@ -108,6 +120,7 @@ private static void outputSymbol(LspBaseProject project,LspBaseFile file,JSONObj
       // remove variable names from detail
       hdl += xdet;
     }
+   xw.field("PREFIX",filpfx);
    xw.field("QNAME",qnam);
    xw.field("HANDLE",hdl);
    xw.end("ITEM");
@@ -120,30 +133,52 @@ private static String cleanDetail(String det)
    StringBuffer buf = new StringBuffer();
    int state = 0;
    int lvl = 0;
+   StringBuffer typ = null;
    for (int i = 0; i < det.length(); ++i) {
       char c = det.charAt(i);
       switch (state) {
          case 0 :
+            // add prefix
             buf.append(c);
-            if (c == '(') state = 1;
+            if (c == '(') {
+               state = 1;
+             }
             break;
          case 1 :
+            // scannning type/parameter name
+            if (typ == null) typ = new StringBuffer();
             if (c == '<') ++lvl;
-            else if (c == '>' && lvl > 0) --lvl;
+            else if (lvl > 0) {
+               if (c == '>') --lvl;
+             }
             else if (c == ' ') {
-               if (lvl == 0) state = 2;
+               if (i+1 < det.length() && det.charAt(i) != ',') {
+                  buf.append(typ);
+                  typ = null;
+                }
+               state = 2;
                break;
              }
-            else if (c == ')') state = 3;
-            buf.append(c);
+            else if (c == ',' || c == ')') {
+               // parameter name only, no type
+               buf.append("dynamic");
+               buf.append(c);
+               typ = null;
+               if (c == ',') state = 1;
+               else state = 3;
+               break;
+             }
+            typ.append(c);
             break;
          case 2 :
+            // skip variable name
             if (c == ',' || c == ')') {
                state = 3;
                buf.append(c);
              }
             break;
          case 3 :
+            // add remainder
             buf.append(c);
             break;
        }

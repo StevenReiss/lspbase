@@ -24,9 +24,6 @@
 	     },
 	   "tagSupport" : {
 	       "valueSet" : [ 1 ]
-	     },
-	    "resolveSupport" : {
-	       "properties" : [ "location.range" ]
 	     }
 	  },
 	 "executeCommand" : {

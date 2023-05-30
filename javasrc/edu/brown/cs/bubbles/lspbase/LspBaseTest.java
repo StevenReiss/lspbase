@@ -133,9 +133,6 @@ private void runTest()
    sendCommand("OPENPROJECT",proj,
          new CommandArgs("PATHS",true),null);
    sendCommand("PATTERNSEARCH",proj,
-         new CommandArgs("PATTERN","initialize","DEFS",true,"REFS",false,
-               "FOR","METHOD"),null);
-   sendCommand("PATTERNSEARCH",proj,
          new CommandArgs("PATTERN","initialize()","DEFS",true,"REFS",false,
                "FOR","METHOD"),null);
    sendCommand("EDITPARAM",null,
