@@ -26,10 +26,8 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -64,6 +62,7 @@ private boolean 	is_open;
 private LspBaseProtocol use_protocol;
 private LspBasePreferences project_preferences;
 private Map<String,EditParameters> edit_parameters;
+
 
 
 
@@ -120,6 +119,10 @@ LspBaseProject(LspBaseMain lm,LspBaseProjectManager pm,String name,File base)
 String getName()				{ return project_name; }
 String getLanguage()				{ return project_language; }
 LspBaseProtocol getProtocol()			{ return use_protocol; }
+LspBaseLanguageData getLanguageData() 
+{
+   return lsp_base.getLanguageData(getLanguage());
+}
 File getBasePath()				{ return base_directory; }
 // NobasePreferences getPreferences()		{ return nobase_prefs; }
 boolean isOpen()				{ return is_open; }
@@ -128,6 +131,19 @@ LspBaseProject [] getReferencedProjects()	{ return new LspBaseProject[0]; }
 LspBaseProject [] getReferencingProjects()	{ return new LspBaseProject[0]; }
 
 LspBasePreferences getPreferences()		{ return project_preferences; }
+
+int getDelayTime(String bid)
+{
+   EditParameters ep = getParameters(bid);
+   return ep.getDelayTime();
+}
+
+boolean getAutoElide(String bid)
+{
+   EditParameters ep = getParameters(bid);
+   return ep.getAutoElide();
+}
+
 
 LspBaseFile findFile(String path)
 {
@@ -389,7 +405,6 @@ void build(boolean refresh,boolean reload)
 	 findFiles(null,dir,reload);
        }
     }
-
 }
 
 

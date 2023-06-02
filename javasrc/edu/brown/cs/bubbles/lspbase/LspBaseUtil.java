@@ -37,22 +37,8 @@ class LspBaseUtil implements LspBaseConstants
 /*                                                                              */
 /********************************************************************************/
 
-static final String [] SymbolKinds = {
-   "None", "File", "Module", "Namespace", "Package",
-   "Class", "Method", "Property", "Field", "Constructor",
-   "Enum", "Interface", "Function", "Variable", "Constant",
-   "String", "Number", "Boolean", "Array", "Object",
-   "Key", "Null", "EnumMember", "Struct", "Event",
-   "Operator", "TypeParameter",
-};
 
 
-
-/********************************************************************************/
-/*                                                                              */
-/*      Constructors                                                            */
-/*                                                                              */
-/********************************************************************************/
 
 
 /********************************************************************************/
@@ -116,9 +102,14 @@ private static void outputSymbol(LspBaseProject project,LspBaseFile file,JSONObj
    String hdl = project.getName() + ":" + filpfx + "#" + qnam;
    String det = sym.optString("detail");
    if (det != null) {
-      String xdet = cleanDetail(det);
-      // remove variable names from detail
-      hdl += xdet;
+      LspBaseLanguageData ldata = project.getLanguageData();
+      if (ldata.getCapabilityBool("useParameters")) {
+         xw.field("PARAMETERS",det);
+       }
+      else {
+         xw.field("DETAIL",det);
+       }
+      hdl += det;
     }
    xw.field("PREFIX",filpfx);
    xw.field("QNAME",qnam);
@@ -126,66 +117,6 @@ private static void outputSymbol(LspBaseProject project,LspBaseFile file,JSONObj
    xw.end("ITEM");
 }
 
-
-
-private static String cleanDetail(String det)
-{
-   StringBuffer buf = new StringBuffer();
-   int state = 0;
-   int lvl = 0;
-   StringBuffer typ = null;
-   for (int i = 0; i < det.length(); ++i) {
-      char c = det.charAt(i);
-      switch (state) {
-         case 0 :
-            // add prefix
-            buf.append(c);
-            if (c == '(') {
-               state = 1;
-             }
-            break;
-         case 1 :
-            // scannning type/parameter name
-            if (typ == null) typ = new StringBuffer();
-            if (c == '<') ++lvl;
-            else if (lvl > 0) {
-               if (c == '>') --lvl;
-             }
-            else if (c == ' ') {
-               if (i+1 < det.length() && det.charAt(i) != ',') {
-                  buf.append(typ);
-                  typ = null;
-                }
-               state = 2;
-               break;
-             }
-            else if (c == ',' || c == ')') {
-               // parameter name only, no type
-               buf.append("dynamic");
-               buf.append(c);
-               typ = null;
-               if (c == ',') state = 1;
-               else state = 3;
-               break;
-             }
-            typ.append(c);
-            break;
-         case 2 :
-            // skip variable name
-            if (c == ',' || c == ')') {
-               state = 3;
-               buf.append(c);
-             }
-            break;
-         case 3 :
-            // add remainder
-            buf.append(c);
-            break;
-       }
-    }
-   
-   return buf.toString();
-}
 
 
 

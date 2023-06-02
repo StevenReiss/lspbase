@@ -264,6 +264,10 @@ void handleEditCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
 	       IvyXml.getAttrString(xml,"VALUE"));
 	 break;
       case "ELIDESET" :
+         handleElisionSetup(proj,IvyXml.getAttrString(xml,"BID","*"),
+	       IvyXml.getAttrString(xml,"FILE"),
+	       IvyXml.getAttrBool(xml,"COMPUTE",true),
+	       LspBaseMonitor.getElements(xml,"REGION"),xw);
 	 break;
       case "STARTFILE" :
 	 handleStartFile(proj,IvyXml.getAttrString(xml,"BID","*"),
@@ -379,6 +383,33 @@ void handleStartFile(String proj,String bid,String file,IvyXmlWriter xw)
    LspBaseFile lbf = lbp.findFile(file);
    if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
    lbf.open();
+}
+
+
+void handleElisionSetup(String proj,String bid,String file,boolean compute,
+      List<Element> regions,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseFile lbf = findFile(proj,file);
+   if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
+   LspBaseElider elider = lbf.getElider();
+   if (regions != null) {
+      elider.clearElideData();
+      for (Element r : regions) {
+	 int soff = IvyXml.getAttrInt(r,"START");
+	 int eoff = IvyXml.getAttrInt(r,"END");
+	 if (soff < 0 || eoff < 0) throw new LspBaseException("Missing start or end offset for elision region");
+	 elider.addElideRegion(soff,eoff);
+       }
+    }
+  if (compute) {
+     xw.begin("ELISION");
+     if (elider != null) elider.computeElision(xw);
+     xw.end("ELISION");
+   }
+  else {
+     xw.emptyElement("SUCCESS");
+   }
 }
 
 

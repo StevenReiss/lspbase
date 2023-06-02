@@ -362,9 +362,14 @@ void addResult(JSONArray syms,JSONObject err)
             LspBaseFile lbf = for_project.findFile(uri);
             if (lbf == null) continue;
           }
-         if (detail_pattern != null) {
-            
+         else if (file_pattern != null) {
+            Matcher m4 = file_pattern.matcher(uri);
+            if (!m4.matches()) continue;
           }
+         
+         if (detail_pattern != null) {
+          }
+         
          LspLog.logD("Search Result " + sym.toString(2));
          result_syms.add(sym);
        }

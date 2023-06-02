@@ -87,9 +87,7 @@ interface LspResponder {
 
 
 interface LspNamer {
-   
    void handleNames(LspBaseProject proj,LspBaseFile file,JSONArray names);
-   
 }
 
 
@@ -128,6 +126,24 @@ class LineCol {
    int getLspColumn()                           { return col_number - 1; }
    
 }       // end of inner class LineCol
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Specification Decoding                                                  */
+/*                                                                              */
+/********************************************************************************/
+
+String [] SymbolKinds = {
+   "None", "File", "Module", "Namespace", "Package",
+   "Class", "Method", "Property", "Field", "Constructor",
+   "Enum", "Interface", "Function", "Variable", "Constant",
+   "String", "Number", "Boolean", "Array", "Object",
+   "Key", "Null", "EnumMember", "Struct", "Event",
+   "Operator", "TypeParameter",
+};
+
 
 
 /********************************************************************************/
@@ -228,6 +244,7 @@ public default JSONObject createJson(Object ... params)
     }
    return jo;
 }
+
 
 
 }       // end of interface LspBaseConstants

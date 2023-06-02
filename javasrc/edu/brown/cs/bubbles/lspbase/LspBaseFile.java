@@ -36,6 +36,7 @@ import javax.swing.text.Position;
 import org.json.JSONObject;
 
 import edu.brown.cs.ivy.file.IvyFile;
+import edu.brown.cs.ivy.xml.IvyXmlWriter;
 
 class LspBaseFile implements LspBaseConstants
 {
@@ -51,10 +52,11 @@ private File for_file;
 private LspBaseProject for_project;
 // private StringBuffer file_contents;
 private String file_language;
-private int file_version;
+private volatile int file_version;
 private LspBaseLineOffsets line_offsets;
 private GapContent file_contents;
 private boolean is_changed;
+private LspBaseElider file_elider;
 
 
 
@@ -74,6 +76,7 @@ LspBaseFile(LspBaseProject proj,File f,String lang)
    file_version = 0;
    line_offsets = null;
    is_changed = false;
+   file_elider = null;
 }
 
 
@@ -90,6 +93,13 @@ String getUri()                 { return getUri(for_file); }
 LspBaseProject getProject()     { return for_project; }
 boolean hasChanged()            { return is_changed; }
 
+synchronized LspBaseElider getElider()
+{
+   if (file_elider == null) {
+      file_elider = new LspBaseElider(this);
+    }
+   return file_elider;
+}
 
 String getContents() {
    if (file_contents == null) {
@@ -109,6 +119,14 @@ String getContents() {
    catch (BadLocationException e) {
       return "";
     }
+}
+
+
+int getLength() 
+{
+   if (file_contents == null) getContents();
+   
+   return file_contents.length();
 }
 
 
@@ -169,6 +187,24 @@ int mapLineCharToOffset(int line,int cpos)
    int lstart = line_offsets.findOffset(line);
    
    return lstart+cpos-1;
+}
+
+
+int mapLineCharToOffset(JSONObject position)
+{
+   return mapLineCharToOffset(position.getInt("line"),
+         position.getInt("character"));
+}
+
+
+int mapRangeToStartOffset(JSONObject range)
+{
+   return mapLineCharToOffset(range.getJSONObject("start"));
+}
+
+int mapRangeToEndOffset(JSONObject range)
+{
+   return mapLineCharToOffset(range.getJSONObject("end"));
 }
    
 
@@ -244,7 +280,7 @@ void reload()
 { }
  
 
-void edit(int id,List<LspBaseEdit> edits)
+void edit(String bid,int id,List<LspBaseEdit> edits)
 {
    // compare id with current version number 
    
@@ -256,21 +292,35 @@ void edit(int id,List<LspBaseEdit> edits)
       for (LspBaseEdit edit : edits) {
          int len = edit.getLength();
          int off = edit.getOffset();
+         int tlen = 0;
          String text = edit.getText();
          if (len > 0) {
             file_contents.remove(off,len);
           }
          if (text != null && text.length() > 0) {
             file_contents.insertString(off,text);
+            tlen = text.length();
+          }
+         if (file_elider != null) {
+            file_elider.noteEdit(off,len,tlen);
           }
        }
     }
    catch (BadLocationException e) { }
    
+   boolean chng = is_changed;
    is_changed = true;
-   ++file_version;
+   int ver = ++file_version;
    for_project.editFile(this,edits);
    
+   LspBaseMain lsp = LspBaseMain.getLspMain();
+   if (!chng) {
+      IvyXmlWriter mxw = lsp.beginMessage("FILECHANGE");
+      mxw.field("FILE",getPath());
+      lsp.finishMessage(mxw);
+    }
+   AutoCompile ac = new AutoCompile(ver,bid);
+   lsp.startTask(ac);
 }
 
 
@@ -317,6 +367,52 @@ Position createPosition(int offset)
     }
 }
 
+
+/********************************************************************************/
+/*                                                                              */
+/*      Auto compile/elide                                                      */
+/*                                                                              */
+/********************************************************************************/
+
+private class AutoCompile implements Runnable {
+   
+   private int edit_version;
+   private String bubbles_id;
+   
+   AutoCompile(int version,String bid) {
+      edit_version = version;
+      bubbles_id = bid;
+    }
+   
+   @Override public void run() {
+      int delay = getProject().getDelayTime(bubbles_id);
+      if (delay < 0) return;
+      if (file_version != edit_version) return;
+      try {
+         Thread.sleep(delay);
+       }
+      catch (InterruptedException e) { }
+      if (file_version != edit_version) return;
+      
+      // get messages for file if that is necessary -- might be automatic
+      
+      if (file_version != edit_version) return;
+      if (getProject().getAutoElide(bubbles_id) && file_elider != null) {
+         LspBaseMain lsp = LspBaseMain.getLspMain();
+         IvyXmlWriter xw = lsp.beginMessage("ELISION",bubbles_id);
+         xw.field("FILE",for_file.getPath());
+         xw.field("ID",edit_version);
+         xw.begin("ELISION");
+         if (file_elider.computeElision(xw)) {
+            if (file_version == edit_version) {
+               xw.end("ELISION");
+               lsp.finishMessage(xw);
+             }
+          }
+       }
+    }
+   
+}       // end of inner class AutoCompile
 
 
 

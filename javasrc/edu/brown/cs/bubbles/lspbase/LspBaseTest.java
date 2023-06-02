@@ -168,6 +168,7 @@ private void runTest()
 
 
 
+@SuppressWarnings("unused")
 private void delay(int time)
 {
    try {
@@ -177,6 +178,7 @@ private void delay(int time)
 }
 
 
+@SuppressWarnings("unused")
 private void waitForRunEvent(long wait)
 {
    long now = System.currentTimeMillis();
@@ -406,7 +408,8 @@ private static class ReplyHandler extends MintDefaultReply {
          LspLog.logI("LSPBASETEST: End of reply");
        }
     }
-   
+  
+   @SuppressWarnings("unused")
    String getResult() {
       return result_value; 
     }

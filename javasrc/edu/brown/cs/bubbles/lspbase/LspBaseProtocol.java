@@ -65,6 +65,7 @@ private LspBaseLanguageData for_language;
 private Writer message_stream;
 private Map<String,File> pathWorkspaceMap;
 private Map<File,List<LspBasePathSpec>> workspacePathMap;
+private JSONObject config_data;
 
 
 
@@ -106,7 +107,22 @@ LspBaseProtocol(File workspace,List<LspBasePathSpec> paths,LspBaseLanguageData l
 
    for_language = ld;
    client_id = ld.getName() + "_" + workspace.getName();
-
+   
+   String rname = "lspbase-" + for_language.getName() + ".json";
+   String json = null;
+   try (InputStream ins = LspBaseProtocol.class.getClassLoader().getResourceAsStream(rname)) {
+      if (ins != null) json = IvyFile.loadFile(ins);
+    }
+   catch (IOException e) { }
+   config_data = null;
+   try {
+      config_data = new JSONObject(json);
+      for_language.setCapabilities(config_data.getJSONObject("lspbaseConfiguration"));
+    }
+   catch (Throwable e) {
+      LspLog.logE("Problem with capability json: " + e);
+    }
+   
    String command = ld.getExecString();
    Map<String,String> keys = new HashMap<>();
    keys.put("ID","LspBase_" + ld.getName() + "_" + workspace.getName());
@@ -196,19 +212,7 @@ void initialize()
       doing_initialization = true;
     }
 
-   String rname = "lspbase-" + for_language.getName() + ".json";
-   String json = null;
-   try (InputStream ins = LspBaseProtocol.class.getClassLoader().getResourceAsStream(rname)) {
-      if (ins != null) json = IvyFile.loadFile(ins);
-    }
-   catch (IOException e) { }
-   JSONObject clientcaps = null;
-   try {
-      clientcaps = new JSONObject(json);
-    }
-   catch (Throwable e) {
-      LspLog.logE("Problem with capability json: " + e);
-    }
+   JSONObject clientcaps = config_data.getJSONObject("initialConfiguration");
 
    JSONObject obj = new JSONObject();
    obj.put("workdoneToken","INITIALIZING");
@@ -256,10 +260,23 @@ private void handleInit(Object resp,JSONObject err)
 
 
 /********************************************************************************/
-/*										*/
-/*	Access Methobds 							*/
-/*										*/
+/*                                                                              */
+/*      JSON creation methods                                                   */
+/*                                                                              */
 /********************************************************************************/
+
+JSONObject createRange(LspBaseFile file,int start,int end)
+{
+   return createJson("start",createPosition(file,start),
+         "end",createPosition(file,end));
+}
+
+
+JSONObject createPosition(LspBaseFile file,int pos)
+{
+   LineCol lc = file.mapOffsetToLineColumn(pos);
+   return createJson("line",lc.getLspLine(),"character",lc.getLspColumn());
+}
 
 
 
@@ -453,43 +470,28 @@ void processNotification(Integer id,String method,Object params)
 
 Object handleWorkspaceConfiguration(int id,JSONObject params)
 {
-   String rname = "lspconfig-" + for_language.getName() + ".json";
-   String config = null;
-   try (InputStream ins = LspBaseProtocol.class.getClassLoader().getResourceAsStream(rname)) {
-      if (ins != null) config = IvyFile.loadFile(ins);
-    }
-   catch (IOException e) { }
+   JSONObject clientconfig = config_data.getJSONObject("clientConfiguration");
    
    JSONArray items = params.getJSONArray("items");
    JSONArray result = new JSONArray();
+   JSONArray exclude = new JSONArray();
    for (int i = 0; i < items.length(); ++i) {
       JSONObject itm = items.getJSONObject(i);
       String scp = itm.optString("scopeUri");
       String section = itm.optString("section");
-      String excludes = null;
       if (scp != null) {
          File ws = pathWorkspaceMap.get(scp);
          if (ws != null) {
             for (LspBasePathSpec lbps : workspacePathMap.get(ws)) {
                if (lbps.isExclude()) {
                   String path = lbps.getFile().getPath();
-                  if (excludes == null) excludes = "\"" + path + "\"";
-                  else excludes += ",\"" + path + "\"";
+                  exclude.put(path);
                 }
              }
           }
        }
-      if (excludes == null) excludes = "[]";
-      else excludes = "[ " + excludes + " ]";
-      String cf = config.replace("$EXCLUDE$",excludes);
-      JSONObject clientconfig = null;
-      try {
-         clientconfig = new JSONObject(cf);
-       }
-      catch (Throwable e) {
-         LspLog.logE("Problem with configuration json: " + e);
-       }
       JSONObject sectionconfig = clientconfig.optJSONObject(section);
+      if (sectionconfig != null) addExcludes(sectionconfig,exclude);
       result.put(sectionconfig);
     }
    
@@ -497,12 +499,27 @@ Object handleWorkspaceConfiguration(int id,JSONObject params)
 }
 
 
+private void addExcludes(JSONObject obj,JSONArray exc)
+{
+   for (String key : obj.keySet()) {
+      switch (key) {
+         case "analysisExcludedFolder" :
+            obj.put(key,exc);
+            break;
+         default :
+            Object val = obj.get(key);
+            if (val instanceof JSONObject) {
+               addExcludes((JSONObject) val,exc);
+             }
+            break;
+       }
+    }
+}
+
+
 Object handleWorkDoneProgressCreate(int id,JSONObject params)
 {
-   String token = params.getString("token");
-   
-   // set up progress for token
-   
+   // handleProgress takes care of this
    return null;
 }
 
