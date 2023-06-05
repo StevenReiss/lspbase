@@ -169,6 +169,13 @@ Set<Integer> decodeTypes(String typ)
 private void decodePattern(String pat,String typ)
 {
    if (pat.startsWith("null.")) pat = pat.substring(5);
+   int idx = pat.indexOf(";");
+   if (idx > 0) {
+      String fnm = pat.substring(0,idx);
+      file_pattern = makeRegexFromWildcard(fnm);
+      pat = pat.substring(idx+1);
+   }
+   
    
    switch (typ) {
       case "CONSTRUCTOR" :
@@ -303,6 +310,12 @@ private void decodePackagePattern(String pat)
 Pattern makeRegexFromWildcard(String wc)
 {
    String q1 = wc.replace(".","\\.");
+   q1 = q1.replace("?","\\?");
+   q1 = q1.replace("(","\\(");
+   q1 = q1.replace(")","\\)");
+   q1 = q1.replace("[","\\[");
+   q1 = q1.replace("]","\\]");
+   
    q1 = q1.replace("*","(.*)");
    
    Pattern pat = Pattern.compile(q1);

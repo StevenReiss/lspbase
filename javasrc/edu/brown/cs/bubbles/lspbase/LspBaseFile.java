@@ -174,10 +174,22 @@ void unlockFile()
 /*                                                                              */
 /********************************************************************************/
 
+int mapLspLineToOffset(int line)
+{
+   return line_offsets.findOffset(line+1);
+}
+
 int mapLineToOffset(int line)
 {
    return line_offsets.findOffset(line);
 }
+
+
+int mapLspLineCharToOffset(int line, int col)
+{ 
+   return mapLineCharToOffset(line+1,col+1);
+}
+
 
 
 int mapLineCharToOffset(int line,int cpos)
@@ -192,9 +204,16 @@ int mapLineCharToOffset(int line,int cpos)
 
 int mapLineCharToOffset(JSONObject position)
 {
-   return mapLineCharToOffset(position.getInt("line"),
+   return mapLspLineCharToOffset(position.getInt("line"),
          position.getInt("character"));
 }
+
+
+int mapLineToOffset(JSONObject position)
+{
+   return mapLspLineToOffset(position.getInt("line"));
+}
+
 
 
 int mapRangeToStartOffset(JSONObject range)
@@ -202,11 +221,24 @@ int mapRangeToStartOffset(JSONObject range)
    return mapLineCharToOffset(range.getJSONObject("start"));
 }
 
+
+int mapRangeToLineStartOffset(JSONObject range)
+{
+   return mapLineToOffset(range.getJSONObject("start"));
+}
+
+
 int mapRangeToEndOffset(JSONObject range)
 {
    return mapLineCharToOffset(range.getJSONObject("end"));
 }
-   
+  
+
+int mapRangeToLineEndOffset(JSONObject range)
+{
+   return mapLineToOffset(range.getJSONObject("end"));
+}
+
 
 int mapOffsetToLine(int offset)
 {
@@ -227,6 +259,8 @@ LineCol mapOffsetToLineColumn(int offset)
    
    return new LineCol(line,offset-lstart+1);
 }
+
+
 
 
 

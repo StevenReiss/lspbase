@@ -433,7 +433,77 @@ void patternSearch(String pat,String typ,boolean defs,boolean refs,boolean syste
    else {
       LspLog.logE("Attempt to get references from pattern search");
     }
+}
 
+
+
+void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolean impls,
+      boolean type,boolean ronly,boolean wonly,IvyXmlWriter xw)
+{
+   LineCol lc = file.mapOffsetToLineColumn(start);
+   LspBaseFindResult rslt = new LspBaseFindResult(this,file,defs,refs,
+         impls,type,ronly,wonly);
+   
+   use_protocol.sendMessage("textDocument/references",
+         (Object data,JSONObject err) -> rslt.addResults(data,err,"REFS"),
+        "textDocument",file.getTextDocumentId(),
+        "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()),
+        "context",createJson("includeDeclaration",defs));
+   
+   use_protocol.sendMessage("textDocument/documentHighlight",
+         (Object data,JSONObject err) -> rslt.addResults(data,err,"HIGH"),
+         "textDocument",file.getTextDocumentId(),
+         "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
+   
+   if (getLanguageData().getCapability("declarationProvider") != null) {
+      use_protocol.sendMessage("textDocument/declaration",
+         (Object data,JSONObject err) -> rslt.addResults(data,err,"DECL"),
+         "textDocument",file.getTextDocumentId(),
+         "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
+    }
+   
+   use_protocol.sendMessage("textDocument/definition",
+         (Object data,JSONObject err) -> rslt.addResults(data,err,"DEFS"),
+         "textDocument",file.getTextDocumentId(),
+         "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn())); 
+  
+   use_protocol.sendMessage("textDocument/typeDefinition",
+         (Object data,JSONObject err) -> rslt.addResults(data,err,"TYPE"),
+         "textDocument",file.getTextDocumentId(),
+         "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn())); 
+   
+   use_protocol.sendMessage("textDocument/implementation",
+         (Object data,JSONObject err) -> rslt.addResults(data,err,"IMPL"),
+         "textDocument",file.getTextDocumentId(),
+         "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn())); 
+   
+   List<JSONObject> rslts = rslt.getResults();
+   if (rslts.isEmpty()) return;
+   for (JSONObject symloc : rslts) {
+      LspLog.logD("OUTPUT "  + symloc);
+      // output result
+    }
+   
+   System.err.println("DONE FIND ALL:");
+}
+
+
+
+private void findLocation(Object data,JSONObject err,String flags)
+{
+   List<JSONObject> rslts = new ArrayList<>();
+   if (data instanceof JSONArray) {
+      JSONArray jarr = (JSONArray) data;
+      for (Object o : jarr.toList()) {
+         rslts.add((JSONObject) o);
+       }
+    }
+   else if (data instanceof JSONObject) {
+      rslts.add((JSONObject) data);
+    }
+   for (JSONObject rslt : rslts) {
+      
+    }
 }
 
 

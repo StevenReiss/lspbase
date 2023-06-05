@@ -212,12 +212,32 @@ void handleCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
 	       IvyXml.getAttrBool(xml,"REFS",true),
 	       IvyXml.getAttrBool(xml,"SYSTEM",false),xw);
 	 break;
-      case "FINDBYKEY" :
       case "FINDDEFINITIONS" :
+         handleFindAll(proj,IvyXml.getAttrString(xml,"FILE"),
+               IvyXml.getAttrInt(xml,"START"),IvyXml.getAttrInt(xml,"END"),
+               IvyXml.getAttrBool(xml,"DEFS",true),
+               IvyXml.getAttrBool(xml,"REFS",false),
+               IvyXml.getAttrBool(xml,"IMPLS",false),
+               IvyXml.getAttrBool(xml,"TYPE",false),
+               false,false,xw);
+         break;
+         
       case "FINDREFERENCES" :
+         handleFindAll(proj,IvyXml.getAttrString(xml,"FILE"),
+               IvyXml.getAttrInt(xml,"START"),IvyXml.getAttrInt(xml,"END"),
+               IvyXml.getAttrBool(xml,"DEFS",true),
+               IvyXml.getAttrBool(xml,"REFS",true),
+               IvyXml.getAttrBool(xml,"IMPLS",false),
+               IvyXml.getAttrBool(xml,"TYPE",false),
+               IvyXml.getAttrBool(xml,"RONLY",false),
+               IvyXml.getAttrBool(xml,"WONLY",false),xw);
+         break;
+         
+      case "FINDBYKEY" :
       case "GETFULLYQUALIFIEDNAME" :
       case "FINDREGIONS" :
 	 break;
+         
       case "GETALLNAMES" :
 	 handleGetAllNames(proj,IvyXml.getAttrString(xml,"BID","*"),
 	       LspBaseMonitor.getSet(xml,"FILE"),
@@ -514,6 +534,25 @@ void handlePatternSearch(String proj,String pat,String sf,
    throws LspBaseException
 {
    forAllProjects(proj,(LspBaseProject np) ->  np.patternSearch(pat,sf,defs,refs,sys,xw));
+}
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Find References/definitions                                             */
+/*                                                                              */
+/********************************************************************************/
+
+void handleFindAll(String proj,String file,int start,int end,
+      boolean defs,boolean refs,boolean impls,boolean type,boolean ronly,
+      boolean wonly,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseFile lbf = findFile(proj,file);
+   if (lbf == null) throw new LspBaseException("File " + file + " not found");
+   
+   lbf.getProject().findAll(lbf,start,end,defs,refs,impls,type,ronly,wonly,xw);
 }
 
 

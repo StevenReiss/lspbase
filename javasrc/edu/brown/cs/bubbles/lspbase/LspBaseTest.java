@@ -54,7 +54,6 @@ public static void main(String [] args)
 {
    LspBaseTest nt = new LspBaseTest(args);
    
-// nt.runTestTrack();
    nt.runTest();
    
    try {
@@ -133,7 +132,7 @@ private void runTest()
    sendCommand("OPENPROJECT",proj,
          new CommandArgs("PATHS",true),null);
    sendCommand("PATTERNSEARCH",proj,
-         new CommandArgs("PATTERN","initialize()","DEFS",true,"REFS",false,
+         new CommandArgs("PATTERN","main.dart;initialize()","DEFS",true,"REFS",false,
                "FOR","METHOD"),null);
    sendCommand("EDITPARAM",null,
          new CommandArgs("NAME","AUTOELIDE","VALUE",true),null);
@@ -146,23 +145,31 @@ private void runTest()
          new CommandArgs("FILE",fil,"COMPUTE",true),null);
    sendCommand("STARTFILE",proj,
          new CommandArgs("FILE",fil,"ID",2),null);
-   sendCommand("FINDREFERENCES",proj,
-         new CommandArgs("FILE",fil,"START",2154,"END",2154,"RONLY",true,
-               "EXACT",true,"EQUIV",true),null);
-   sendCommand("FINDREFERENCES",proj,
-         new CommandArgs("FILE",fil,"START",2154,"END",2154,"RONLY",true,
-               "EXACT",true,"EQUIV",true),null);
-   sendCommand("FINDREFERENCES",null,
-         new CommandArgs("FILE",fil,"START",2154,"END",2154,"WONLY",true,
-               "EXACT",true,"EQUIV",true),null);
-   sendCommand("FINDDEFINITIONS",null,
-         new CommandArgs("FILE",fil,"START",2154,"END",2154),null);
-   sendCommand("GETFULLYQUALIFIEDNAME",null,
-         new CommandArgs("FILE",fil,"START",2154,"END",2154),null);
+   lookupPoint(proj,fil,2154);
+   lookupPoint(proj,fil,2114);
+   lookupPoint(proj,fil,2120);
    sendCommand("COMMIT",proj,
          new CommandArgs("SAVE",true),null);
    sendCommand("SAVEWORKSPACE",null,
          new CommandArgs("WS",ws),null);
+}
+
+private void lookupPoint(String proj,String fil,int where)
+{
+   sendCommand("FINDREFERENCES",proj,
+         new CommandArgs("FILE",fil,"START",where,"END",where,"RONLY",true,
+               "EXACT",true,"EQUIV",true),null);
+   sendCommand("FINDREFERENCES",proj,
+         new CommandArgs("FILE",fil,"START",where,"END",where,"RONLY",true,
+               "EXACT",true,"EQUIV",true),null);
+   sendCommand("FINDREFERENCES",null,
+         new CommandArgs("FILE",fil,"START",where,"END",where,"WONLY",true,
+               "EXACT",true,"EQUIV",true),null);
+   sendCommand("FINDDEFINITIONS",null,
+         new CommandArgs("FILE",fil,"START",where,"END",where),null);
+   sendCommand("GETFULLYQUALIFIEDNAME",null,
+         new CommandArgs("FILE",fil,"START",where,"END",where),null);
+   
 }
 
 

@@ -180,10 +180,9 @@ void handleFolds(ElideData data,Object resp,JSONObject err)
    JSONArray folds = (JSONArray) resp;
    for (int i = 0; i < folds.length(); ++i) {
       JSONObject fold = folds.getJSONObject(i);
-      int soff = for_file.mapLineCharToOffset(fold.getInt("startLine")+1,
-            fold.getInt("startCharacter")+1);
-      int eoff = for_file.mapLineCharToOffset(fold.getInt("endLine")+1,
-            fold.getInt("endCharacter")+1);
+      int soff = for_file.mapLspLineToOffset(fold.getInt("startLine"));
+      int eoff = for_file.mapLspLineCharToOffset(fold.getInt("endLine"),
+            fold.getInt("endCharacter"));
       if (!data.isRelevant(soff,eoff)) continue;
       String kind = fold.optString("kind","region");
       String typ = null;
@@ -220,7 +219,7 @@ void handleDecls(ElideData data,Object resp,JSONObject err)
 private void handleDecl(ElideData data,JSONObject decl)
 {
    JSONObject range = decl.getJSONObject("range");
-   int soff = for_file.mapRangeToStartOffset(range);
+   int soff = for_file.mapRangeToLineStartOffset(range);
    int eoff = for_file.mapRangeToEndOffset(range);
    if (!data.isRelevant(soff,eoff)) return;
    
@@ -248,7 +247,7 @@ void handleTokens(ElideData edata,ElideRange range,Object resp,JSONObject err)
       if (dline > 0) col = 0;
       col += arr.getInt(i+1);
       int len = arr.getInt(i+2);
-      int soff = for_file.mapLineCharToOffset(line+1,col+1);
+      int soff = for_file.mapLspLineCharToOffset(line,col);
       int eoff = soff + len;
       
       
@@ -259,7 +258,7 @@ void handleTokens(ElideData edata,ElideRange range,Object resp,JSONObject err)
       if (modbits != 0) {
          for (int j = 0; j < token_modifiers.length; ++j) {
             if ((modbits & (1<<j)) != 0) {
-               typ += ";" + token_modifiers[j];
+               mods += ";" + token_modifiers[j];
                modset.add(token_modifiers[j]);
              }
           }
@@ -269,8 +268,10 @@ void handleTokens(ElideData edata,ElideRange range,Object resp,JSONObject err)
       if (!edata.isRelevant(soff,eoff)) continue;
       String st = getSymbolType(typ,modset);
       if (st == null) continue;
+      String nt = getNodeType(typ,modset);
       ElideNode en = edata.addNode(soff,eoff);
       en.setSymbolType(st);  
+      en.setNodeType(nt);
     }
 }
 
@@ -294,7 +295,12 @@ String getSymbolType(String typ,Set<String> mods)
       case "struct" :
       case "typeParameter" :
          t = "TYPE";
-         if (mods.contains("declaration")) {
+         if (mods.contains("constructor")) {
+            if (mods.contains("declaration")) {
+               t = "METHODDECL";
+             }
+          }
+         else if (mods.contains("declaration")) {
             t = "CLASSDECL";
             if (mods.contains("static")) t += "S";
           }
@@ -305,17 +311,23 @@ String getSymbolType(String typ,Set<String> mods)
          if (mods.contains("declaration")) {
             t = "PARAMDECL";
           }
+         else if (mods.contains("label")) {
+            t = "LABEL";
+          }
          break;
          
       case "variable" :
          t = "VARIABLE";
          if (mods.contains("declaration")) {
-            t = "LOCALDECL";
+            t = "VARDECL";
           }
          break;
 
       case "property" :
-         t = "ANNOT";
+         if (mods.contains("annotation")) t = "ANNOT";
+         else if (mods.contains("static")) t = "FIELDS";
+         else if (mods.contains("instance")) t = "FIELD";
+         else t = "FIELDC";
          break;
          
       case "enumMember" :
@@ -337,7 +349,6 @@ String getSymbolType(String typ,Set<String> mods)
          break;
          
       case "decorator" :
-      case "annotation" :
          t = "ANNOT";
          break;
          
@@ -357,6 +368,25 @@ String getSymbolType(String typ,Set<String> mods)
    return t;
 }
 
+
+private String getNodeType(String typ,Set<String> mods)
+{
+   String t = null;
+   
+   switch (typ) {
+      case "function" :
+      case "method" :
+         if (!mods.contains("declaration")) {
+            t = "CALL";
+            if (mods.contains("deprecated")) t += "D";
+            if (mods.contains("abstract")) t += "A";
+            else if (mods.contains("static")) t += "S";
+          }
+         break;
+    }
+   
+   return t;
+}
 
 
 /********************************************************************************/
