@@ -36,7 +36,11 @@
 package edu.brown.cs.bubbles.lspbase;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
+import javax.swing.text.Segment;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -60,7 +64,8 @@ private boolean         find_type;
 private boolean         read_only;
 private boolean         write_only;
 
-private List<JSONObject> result_locs;
+private Map<RefResult,RefResult> result_locs;
+
 
 
 
@@ -82,7 +87,7 @@ LspBaseFindResult(LspBaseProject proj,LspBaseFile file,
    find_type = type;
    read_only = ronly;
    write_only = wonly;
-   result_locs = new ArrayList<>();
+   result_locs = new HashMap<>();
 }
 
 
@@ -93,9 +98,9 @@ LspBaseFindResult(LspBaseProject proj,LspBaseFile file,
 /*                                                                              */
 /********************************************************************************/
 
-List<JSONObject> getResults()
+List<FindResult> getResults()
 {
-   return result_locs;
+   return new ArrayList<>(result_locs.keySet());
 }
 
 
@@ -135,25 +140,178 @@ private void processResult(JSONObject data,String what)
    else {
       lbf = start_file;
     }
-   if (lbf == null) return;
+   // if DEFS and lbf is null bu uri is not null, consider finding def in that file
+   // using a documentSymbols search at this point
    
-   JSONObject range = null;
-   JSONObject srange = null;
+   if (lbf == null) return;
+   JSONObject range = data.optJSONObject("range");
+   if (range != null && what.equals("REFS")) {
+      int off0 = lbf.mapRangeToStartOffset(range);
+      int off1 = lbf.mapRangeToEndOffset(range);
+      Segment seg = lbf.getSegment(off0,off1-off0);
+      int delta = 0;
+      while (!Character.isJavaIdentifierStart(seg.charAt(delta))) {
+         ++delta;
+       }
+      if (delta > 0) {
+         JSONObject rangestart = range.getJSONObject("start");
+         int cpos = rangestart.getInt("character");
+         rangestart.put("character",cpos+delta);
+       }
+    }
+   
+   JSONObject def = null;
+   JSONObject cont = null;
+   JSONObject defrange = null;
    range = data.optJSONObject("range");
    if (range == null) {
-      range = data.optJSONObject("targetRange");
-      srange = data.optJSONObject("targetSelectionRange");
+      defrange = data.optJSONObject("targetRange");
+      range = data.optJSONObject("targetSelectionRange");
     }
    if (range == null) return;
    
-   int kind = data.optInt("kind",0);
+   if (defrange != null) {
+      int offset0 = lbf.mapRangeToStartOffset(defrange);
+      int offset1 = lbf.mapRangeToEndOffset(defrange);
+      JSONArray syms = lbf.getSymbols();
+      for (int i = 0; i < syms.length(); ++i) {
+         JSONObject sym = syms.getJSONObject(i);
+         JSONObject rng = sym.getJSONObject("range");
+         int doffset0 = lbf.mapRangeToStartOffset(rng);
+         int doffset1 = lbf.mapRangeToEndOffset(rng);
+         if (offset0 == doffset0 && offset1 == doffset1) {
+            def = sym;
+            break;
+          }
+         if (doffset0 <= offset0 && doffset1 >= offset1) {
+            cont = sym;
+          }
+       }
+    }
+   if (what.equals("DEFS") || what.equals("DECL")) {
+      if (def == null) {
+         int off0 = lbf.mapRangeToStartOffset(range);
+         int off1 = lbf.mapRangeToEndOffset(range);
+         def = new JSONObject();
+         def.put("name",lbf.getSegment(off0,off1-off0).toString());
+         def.put("kind",27);            // local variable?
+         def.put("location",
+               createJson("uri",lbf.getUri(),"range",defrange));
+         if (cont != null) {
+            def.put("containerName",cont.getString("name"));
+          }
+       }
+    }
    
-   int soffset = lbf.mapRangeToStartOffset(range);
-   int eoffset = lbf.mapRangeToEndOffset(range);
-
-   System.err.println("FOUND " + lbf.getPath() + " " + range + " " + kind + " " +
-         soffset + " " + eoffset + " " + srange + " " + what);
+   boolean skip = false;
+   if (what.equals("HIGH")) {
+      int kind = data.optInt("kind",0);
+      if (kind != 0) {
+         // if kind is specified
+         if (write_only && kind != 3) skip = true;
+         if (read_only && kind == 3) skip = true;
+       }
+    }
+   if (what.equals("IMPL")) {
+      System.err.println("CHECK HERE");
+    }
+   
+   RefResult rr;
+   switch (what) {
+      case "REFS" :
+         if (find_refs) rr = addResult(lbf,range);
+         break;
+      case "HIGH" :
+         if (skip) removeResult(lbf,range);
+         break;
+      case "DECL" :
+      case "DEFS" :
+         if (find_defs) rr = addResult(lbf,range);
+         else removeResult(lbf,range);
+         for (RefResult rr1 : result_locs.keySet()) {
+            rr1.setDefinition(def);
+          }
+         break;
+      case "TYPE" :
+         if (find_type) {
+            rr = addResult(lbf,range);
+            rr.setDefinition(def);
+          }
+         break;
+      case "IMPL" :
+         if (find_impls) {
+            rr = addResult(lbf,range);
+            rr.setDefinition(def);
+          }
+         break;
+    }
 }
+
+
+
+private RefResult addResult(LspBaseFile lbf,JSONObject range)
+{
+   RefResult rr = new RefResult(lbf,range);
+   RefResult rr1 = result_locs.putIfAbsent(rr,rr);
+   if (rr1 != null) return rr1;
+   return rr;
+}
+
+
+private void removeResult(LspBaseFile lbf,JSONObject range)
+{
+   RefResult rr = new RefResult(lbf,range);
+   result_locs.remove(rr);
+}
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Search result                                                           */
+/*                                                                              */
+/********************************************************************************/
+
+private class RefResult implements FindResult {
+   
+   private JSONObject match_range;
+   private LspBaseFile match_file;
+   private JSONObject def_result;
+   private int start_offset;
+   private int end_offset;
+ 
+   RefResult(LspBaseFile file,JSONObject range) {
+      match_range = range;
+      match_file = file;
+      start_offset = file.mapRangeToStartOffset(range);
+      end_offset = file.mapRangeToEndOffset(range);
+      def_result = null;
+    }
+   
+   @Override public JSONObject getRange()               { return match_range; }
+   @Override public LspBaseFile getFile()               { return match_file; }
+   @Override public JSONObject getDefinition()          { return def_result; }
+   
+   void setDefinition(JSONObject def) {
+      if (def != null && def_result == null) def_result = def;
+    }
+   
+   @Override public int hashCode() {
+      int hc = match_file.hashCode() + start_offset + end_offset;
+      return hc;
+    }
+   
+   @Override public boolean equals(Object o) {
+      if (o instanceof RefResult) {
+         RefResult rr = (RefResult) o;
+         if (start_offset == rr.start_offset && end_offset == rr.end_offset &&
+               match_file == rr.match_file) return true;
+       }
+      return false;
+    }
+   
+   
+}       // end of RefResult
 
 
 }       // end of class LspBaseFindResult

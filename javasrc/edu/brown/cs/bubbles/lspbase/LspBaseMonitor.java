@@ -239,6 +239,16 @@ private String handleCommand(String cmd,String proj,Element xml) throws LspBaseE
       case "ELIDESET" :
       case "STARTFILE" :
       case "COMMIT" :
+      case "EDITFILE" :
+      case "INDENT" :
+      case "FIXINDENTS" :
+      case "GETCOMPLETIONS" :
+      case "CREATEPRIVATE" :
+      case "PRIVATEEDIT" :
+      case "REMOVEPRIVATE" :
+      case "QUICKFIX" :
+      case "FIXIMPORTS" :
+      case "RENAME" :
          lsp_base.getProjectManager().handleEditCommand(cmd,proj,xml,xw);
          break;
       case "GETRUNCONFIG" :
@@ -262,11 +272,6 @@ private String handleCommand(String cmd,String proj,Element xml) throws LspBaseE
          lsp_base.getDebugManager().handleCommand(cmd,proj,xml,xw);
          break;
          
-      case "CREATEPRIVATE" :
-      case "PRIVATEEDIT" :
-      case "REMOVEPRIVATE" :
-         // Java-only commands
-	 break;
       case "SAVEWORKSPACE" :
          xw.text("SAVED");
          break;
@@ -305,6 +310,22 @@ static Set<String> getSet(Element xml,String key)
    
    return items;
 }
+
+
+static List<LspBaseEdit> getEditSet(Element xml)
+{
+   List<LspBaseEdit> edits = new ArrayList<>();
+   
+   for (Element c : IvyXml.children(xml,"EDIT")) {
+      LspBaseEdit edi = new LspBaseEdit(c);
+      edits.add(edi);
+    }
+   
+   return edits;
+}
+
+
+
 
 
 static List<Element> getElements(Element xml,String key)

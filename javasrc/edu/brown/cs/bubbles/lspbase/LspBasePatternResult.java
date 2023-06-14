@@ -255,6 +255,7 @@ private void decodeMethodPattern(String pat)
       String qual = pat.substring(0,idx4);
       container_pattern = makeRegexFromWildcard(qual);
       pat = pat.substring(idx4+1);
+      idx0 = pat.indexOf("(");
     }
    if (idx0 > 0) {
       int idx5 = pat.lastIndexOf(")");
@@ -345,7 +346,7 @@ void addResult(JSONArray syms,JSONObject err)
       for (int i = 0; i < syms.length(); ++i) {
          JSONObject sym = syms.getJSONObject(i);
          String nm = sym.getString("name");
-         String detail = sym.optString("detail");
+         String detail = sym.optString("detail",null);
          int idx1 = nm.indexOf("(");
          if (idx1 > 0) {
             detail = nm.substring(idx1);

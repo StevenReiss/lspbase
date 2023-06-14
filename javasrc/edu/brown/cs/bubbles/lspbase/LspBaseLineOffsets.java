@@ -39,6 +39,7 @@ class LspBaseLineOffsets implements LspBaseConstants
 
 private int [] ide_offset;
 private int max_ide;
+private int max_char;
 private int newline_adjust;
 
 
@@ -55,6 +56,7 @@ LspBaseLineOffsets(String newline,Reader input)
    ide_offset = new int[128];
    ide_offset[0] = -1;
    max_ide = 1;
+   max_char = 0;
    
    setupIde(input,newline);
 }
@@ -73,7 +75,8 @@ private void setupIde(Reader r,String nl)
    
    boolean lastcr = false;
    try {
-      for (int i = 0; ; ++i) {
+      int i = 0;
+      for ( ; ; ++i) {
 	 int ch = r.read();
 	 if (ch < 0) break;
 	 if (nl.equals("\r")) {
@@ -86,6 +89,8 @@ private void setupIde(Reader r,String nl)
 	    lastcr = (ch == '\r');
 	  }
        }
+      addIde(i);
+      max_char = i;
       r.close();
     }
    catch (IOException e) {
@@ -113,16 +118,20 @@ private void addIde(int i)
 synchronized void update(int soff,int eoff,String cnts)
 {
    if (cnts == null && soff == eoff) return;
+   
    int ct = 0;
    if (cnts != null) {
       for (int idx = cnts.indexOf('\n'); idx >= 0; idx = cnts.indexOf('\n',idx+1)) ++ct;
     }
+   
    int idx0 = findIndex(soff);
    int idx1 = findIndex(eoff);
    int oct = idx1-idx0;
    int delta = 0;
    if (cnts != null) delta = cnts.length() - (eoff-soff);
    else delta = soff - eoff;
+   
+   LspLog.logD("UPDATE LINE OFFSETS " + soff + " " + eoff + " " + ct + " " + delta + " " + oct);
    
    grow(max_ide + ct - oct);	     // ensure we fit
    if (ct > oct) {
@@ -157,7 +166,8 @@ synchronized void update(int soff,int eoff,String cnts)
 
 synchronized int findOffset(int line)
 {
-   if (line < 0 || line >= max_ide) return -1;
+   if (line < 0) return 0;
+   if (line >= max_ide) return max_char;
    return ide_offset[line];
 }
 
@@ -166,7 +176,13 @@ synchronized int findOffset(int line)
 synchronized int findLine(int off)
 {
    int sidx = Arrays.binarySearch(ide_offset,0,max_ide,off);
-   if (sidx < 0) sidx = -sidx - 2;
+   if (sidx < 0) {
+      sidx = -sidx - 2;
+    }
+   if (sidx < 0) {
+      if (off < 0) return 0;
+      if (off > ide_offset[max_ide-1]) return max_ide;
+    }
    return sidx;
 }
 

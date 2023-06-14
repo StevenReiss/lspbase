@@ -109,6 +109,9 @@ long LSPBASE_POOL_KEEP_ALIVE_TIME = 2*60*1000;
 /*                                                                              */
 /********************************************************************************/
 
+String TOKEN_TYPES = "semanticTokensProvider.legend.tokenTypes";
+String TOKEN_MODS = "semanticTokensProvider.legend.tokenModifiers";
+
 
 class LineCol {
    private int line_number;
@@ -128,6 +131,13 @@ class LineCol {
 }       // end of inner class LineCol
 
 
+interface FindResult {
+   JSONObject getRange();
+   JSONObject getDefinition();
+   LspBaseFile getFile();
+}
+
+
 
 /********************************************************************************/
 /*                                                                              */
@@ -141,9 +151,20 @@ String [] SymbolKinds = {
    "Enum", "Interface", "Function", "Variable", "Constant",
    "String", "Number", "Boolean", "Array", "Object",
    "Key", "Null", "EnumMember", "Struct", "Event",
-   "Operator", "TypeParameter",
+   "Operator", "TypeParameter", "Local"
 };
 
+String [] CompletionKinds = {
+      "OTHER", "OTHER", "METHOD_REF", "METHOD_REF", "METHOD_REF",
+      "FIELD_REF", "LOCAL_VARIABLE_REF", "TYPE_REF", "TYPE_REF", "PACKAGE_REF",
+      "FIELD_REF", "OTHER", "OTHER", "TYPE_REF", "KEYWORD", 
+      "OTHER", "OTHER", "OTHER", "OTHER", "OTHER",
+      "FIELD_REF", "OTHER", "TYPE_REF", "OTHER", "OTHER",
+      "TYPE_REF"
+};
+
+
+String PRIVATE_PREFIX = "_private_buffer_";
 
 
 /********************************************************************************/
@@ -155,7 +176,7 @@ String [] SymbolKinds = {
 enum BreakType {
    NONE,
    LINE,
-   EXCEPTION,
+   EXCEPTION, 
    FUNCTION,
    DATA,
 }
@@ -243,6 +264,16 @@ public default JSONObject createJson(Object ... params)
       jo.put(key,val);
     }
    return jo;
+}
+
+
+public default JSONArray createJsonArray(Object ... elts)
+{
+   JSONArray jarr = new JSONArray();
+   for (int i = 0; i < elts.length; ++i) {
+      jarr.put(elts[i]);
+    }
+   return jarr;
 }
 
 

@@ -158,6 +158,12 @@ LspBaseFile findFile(String proj,String file)
        }
       file = file.substring(j);
     }
+   int idx0 = file.indexOf(PRIVATE_PREFIX);
+   if (idx0 > 0) {
+      int idx1 = file.lastIndexOf(".");
+      String tail = (idx1 > 0 ? file.substring(idx1) : "");
+      file = file.substring(0,idx0) + tail;
+    }
    if (proj != null) {
       try {
 	 LspBaseProject p = findProject(proj);
@@ -233,10 +239,34 @@ void handleCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
                IvyXml.getAttrBool(xml,"WONLY",false),xw);
          break;
          
-      case "FINDBYKEY" :
       case "GETFULLYQUALIFIEDNAME" :
+         handleFullyQualifiedName(proj,IvyXml.getAttrString(xml,"FILE"),
+               IvyXml.getAttrInt(xml,"START"),
+               IvyXml.getAttrInt(xml,"END"),xw);
+         break;
+         
+      case "FINDBYKEY" :
+         handleFindByKey(proj,IvyXml.getAttrString(xml,"FILE"),
+               IvyXml.getAttrString(xml,"KEY"),xw);
+         break;
+         
       case "FINDREGIONS" :
+          handleFindRegions(proj,IvyXml.getAttrString(xml,"BID","*"),
+               IvyXml.getAttrString(xml,"FILE"),
+               IvyXml.getAttrString(xml,"CLASS"),
+               IvyXml.getAttrBool(xml,"PREFIX",false),
+               IvyXml.getAttrBool(xml,"STATICS",false),
+               IvyXml.getAttrBool(xml,"COMPUNIT",false),
+               IvyXml.getAttrBool(xml,"IMPORTS",false),
+               IvyXml.getAttrBool(xml,"PACKAGE",false),
+               IvyXml.getAttrBool(xml,"TOPDECLS",false),
+               IvyXml.getAttrBool(xml,"FIELDS",false),
+               IvyXml.getAttrBool(xml,"ALL",false),xw);
 	 break;
+         
+      case "FINDPACKAGE" :
+         handleFindPackage(proj,IvyXml.getAttrString(xml,"NAME"),xw);
+         break;
          
       case "GETALLNAMES" :
 	 handleGetAllNames(proj,IvyXml.getAttrString(xml,"BID","*"),
@@ -251,21 +281,9 @@ void handleCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
 	 if (pxml == null) pxml = IvyXml.getChild(xml,"OPTIONS");
 	 handleSetPreferences(proj,pxml,xw);
 	 break;
-      case "COMMIT" :
-	 handleCommit(proj,IvyXml.getAttrString(xml,"BID","*"),
-	       IvyXml.getAttrBool(xml,"REFRESH",false),
-	       IvyXml.getAttrBool(xml,"SAVE",false),
-	       LspBaseMonitor.getElements(xml,"FILE"),xw);
-	  break;
-      case "EDITPARAM" :
-	 handleEditParam(proj,IvyXml.getAttrString(xml,"BID","*"),
-	       IvyXml.getAttrString(xml,"NAME"),
-	       IvyXml.getAttrString(xml,"VALUE"));
-	 break;
       case "CREATEPROJECT" :
       case "EDITPROJECT" :
       case "CREATEPACKAGE" :
-      case "FINDPACKAGE" :
       case "CREATECLASS" :
       default :
 	 LspLog.logE("Unknown project command " + cmd);
@@ -297,8 +315,86 @@ void handleEditCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
 	 handleCommit(proj,IvyXml.getAttrString(xml,"BID","*"),
 	       IvyXml.getAttrBool(xml,"REFRESH"),
 	       IvyXml.getAttrBool(xml,"SAVE"),
+               IvyXml.getAttrBool(xml,"COMPILE"),
 	       LspBaseMonitor.getElements(xml,"FILES"),xw);
 	 break;
+      case "EDITFILE" :
+         handleEditFile(proj,IvyXml.getAttrString(xml,"BID","*"),
+               IvyXml.getAttrString(xml,"FILE"),
+               IvyXml.getAttrInt(xml,"ID"),
+               LspBaseMonitor.getEditSet(xml),xw);
+         break; 
+      case "INDENT" :
+         handleIndent(proj,IvyXml.getAttrString(xml,"BID","*"),
+               IvyXml.getAttrString(xml,"FILE"),
+               IvyXml.getAttrInt(xml,"ID"),
+               IvyXml.getAttrInt(xml,"OFFSET"),
+               IvyXml.getAttrBool(xml,"SPLIT"),xw);
+         break;
+      case "FIXINDENTS" :
+         handleFixIndents(proj,IvyXml.getAttrString(xml,"BID","*"),
+               IvyXml.getAttrString(xml,"FILE"),
+               IvyXml.getAttrInt(xml,"ID"),
+               IvyXml.getAttrInt(xml,"OFFSET"),xw);
+         break;      
+      case "GETCOMPLETIONS" :
+         handleGetCompletions(proj,IvyXml.getAttrString(xml,"BID","*"),
+               IvyXml.getAttrString(xml,"FILE"),
+               IvyXml.getAttrInt(xml,"OFFSET"),xw);
+         break;
+      case "CREATEPRIVATE" :
+         handleCreatePrivateBuffer(proj,IvyXml.getAttrString(xml,"BID","*"),
+               IvyXml.getAttrString(xml,"PID"),
+               IvyXml.getAttrString(xml,"FILE"),
+               IvyXml.getAttrString(xml,"FROMPID"),xw);
+         
+         break;
+      case "PRIVATEEDIT" :
+         handlePrivateBufferEdit(proj,IvyXml.getAttrString(xml,"PID","*"),
+               IvyXml.getAttrString(xml,"FILE"),
+               LspBaseMonitor.getEditSet(xml),xw);
+         
+         break;
+      case "REMOVEPRIVATE" :
+         handleRemovePrivateBuffer(proj,
+               IvyXml.getAttrString(xml,"PID"),
+               IvyXml.getAttrString(xml,"FILE"));
+         
+         break;
+      case "QUICKFIX" : 
+         handleQuickFix(proj,IvyXml.getAttrString(xml,"BID","*"),
+               IvyXml.getAttrString(xml,"FILE"),
+               IvyXml.getAttrInt(xml,"OFFSET"),
+               IvyXml.getAttrInt(xml,"LENGTH"),
+               LspBaseMonitor.getElements(xml,"PROBLEM"),xw);
+         break;
+      case "FIXIMPORTS" :
+         handleFixImports(proj,
+               IvyXml.getAttrString(xml,"BID","*"),
+               IvyXml.getAttrString(xml,"FILE"),
+               IvyXml.getAttrInt(xml,"DEMAND",0),
+               IvyXml.getAttrInt(xml,"STATICDEMAND",0),
+               IvyXml.getAttrString(xml,"ORDER"),
+               IvyXml.getAttrString(xml,"ADD"),xw);
+         break;
+      case "RENAME" :
+         handleRename(proj,IvyXml.getAttrString(xml,"BID","*"),
+               IvyXml.getAttrString(xml,"FILE"),
+               IvyXml.getAttrInt(xml,"START"),IvyXml.getAttrInt(xml,"END"),
+               IvyXml.getAttrString(xml,"NAME"),IvyXml.getAttrString(xml,"HANDLE"),
+               IvyXml.getAttrString(xml,"NEWNAME"),
+               IvyXml.getAttrBool(xml,"KEEPORIGINAL",false),
+               IvyXml.getAttrBool(xml,"RENAMEGETTERS",false),
+               IvyXml.getAttrBool(xml,"RENAMESETTERS",false),
+               IvyXml.getAttrBool(xml,"UPDATEHIERARCHY",false),
+               IvyXml.getAttrBool(xml,"UPDATEQUALIFIED",false),
+               IvyXml.getAttrBool(xml,"UPDATEREFS",true),
+               IvyXml.getAttrBool(xml,"UPDATESIMILAR",false),
+               IvyXml.getAttrBool(xml,"UPDATETEXT",false),
+               IvyXml.getAttrBool(xml,"DOEDIT",false),
+               IvyXml.getAttrString(xml,"FILES"),xw);
+         break;
+         
     }
 }
 
@@ -368,12 +464,14 @@ void handleBuildProject(String proj,boolean clean,boolean full,boolean refresh,I
 /*										*/
 /********************************************************************************/
 
-void handleCommit(String proj,String bid,boolean refresh,boolean save,List<Element> files,IvyXmlWriter xw)
+void handleCommit(String proj,String bid,
+      boolean refresh,boolean save,boolean compile,
+      List<Element> files,IvyXmlWriter xw)
    throws LspBaseException
 {
    xw.begin("COMMIT");
    forAllProjects(proj,
-	 (LspBaseProject p) -> p.commit(bid,refresh,save,files,xw));
+	 (LspBaseProject p) -> p.commit(bid,refresh,save,compile,files,xw))         ;
    xw.end("COMMIT");
 }
 
@@ -402,7 +500,7 @@ void handleStartFile(String proj,String bid,String file,IvyXmlWriter xw)
    if (lbp == null) throw new LspBaseException("Project " + proj + " not found");
    LspBaseFile lbf = lbp.findFile(file);
    if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
-   lbf.open();
+   lbf.open(bid);
 }
 
 
@@ -432,6 +530,139 @@ void handleElisionSetup(String proj,String bid,String file,boolean compute,
    }
 }
 
+
+void handleEditFile(String proj,String bid,String file,int eid,
+      List<LspBaseEdit> edits,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseFile lbf = findFile(proj,file);
+   if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
+   lbf.edit(bid,eid,edits);
+   LspLog.logD("DONE EDIT");
+   xw.emptyElement("SUCCESS");
+}
+
+
+
+void handleIndent(String proj,String bid,String file,int eid,int offset,boolean split,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseFile lbf = findFile(proj,file);
+   if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
+   lbf.computeIndent(bid,eid,offset,split,xw);
+}
+
+
+
+void handleFixIndents(String proj,String bid,String file,int eid,int offset,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseFile lbf = findFile(proj,file);
+   if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
+   lbf.fixIndents(bid,eid,offset,xw);
+}
+
+
+
+void handleGetCompletions(String proj,String bid,String file,int offset,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseFile lbf = findFile(proj,file);
+   if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
+   lbf.getCompletions(bid,offset,xw);
+}
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Handle FIXIMPORTS                                                       */
+/*                                                                              */
+/********************************************************************************/
+
+void handleFixImports(String proj,String bid,String file,
+      int demand,int staticdemand,String order,String add,
+      IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseFile lbf = findFile(proj,file);
+   if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
+   lbf.fixImports(bid,demand,staticdemand,order,add,xw);
+}
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Handle QUICKFIX                                                         */
+/*                                                                              */
+/********************************************************************************/
+
+void handleQuickFix(String proj,String bid,String file,int offset,int length,
+      List<Element> problems,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseFile lbf = findFile(proj,file);
+   if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
+   lbf.getCodeActions(bid,offset,length,problems,xw);
+}
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Handle RENAME                                                           */
+/*                                                                              */
+/********************************************************************************/
+
+void handleRename(String proj,String bid,String file,
+      int soffset,int eoffset,
+      String name,String handle,String newname,
+      boolean keeporig,boolean getters,boolean setters,
+      boolean hier,boolean qualified,boolean refs,
+      boolean similar,boolean text,boolean doedit,
+      String files,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseFile lbf = findFile(proj,file);
+   if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
+   lbf.rename(soffset,eoffset,name,handle,newname,keeporig,getters,setters,
+         hier,qualified,refs,similar,text,doedit,files,xw);
+}
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Private buffer commands                                                 */
+/*                                                                              */
+/********************************************************************************/
+
+void handleCreatePrivateBuffer(String proj,String bid,String pid,String file,String frompid,
+      IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseFile lbf = findFile(proj,file);
+   if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
+   lbf.createPrivateBuffer(bid,pid,frompid,xw);
+}
+
+
+
+void handlePrivateBufferEdit(String proj,String pid,String file,List<LspBaseEdit> edits,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseFile lbf = findFile(proj,file);
+   if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
+   lbf.editPrivateBuffer(pid,edits,xw);
+}
+
+
+void handleRemovePrivateBuffer(String proj,String pid,String file)
+   throws LspBaseException
+{
+   LspBaseFile lbf = findFile(proj,file);
+   if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
+   lbf.removePrivateBuffer(pid);
+}
 
 
 /********************************************************************************/
@@ -472,23 +703,23 @@ private class NameThread extends Thread implements LspNamer {
 
    @Override public void handleNames(LspBaseProject project,LspBaseFile file,JSONArray names) {
       if (xml_writer == null) {
-	 xml_writer = lsp_main.beginMessage("NAMES",bump_id);
-	 xml_writer.field("NID",name_id);
+         xml_writer = lsp_main.beginMessage("NAMES",bump_id);
+         xml_writer.field("NID",name_id);
        }
-
+   
       xml_writer.begin("FILE");
       xml_writer.textElement("PATH",file.getPath());
       for (int i = 0; i < names.length(); ++i) {
-	 LspBaseUtil.outputLspSymbol(project,file,names.getJSONObject(i),xml_writer);
+         LspBaseUtil.outputLspSymbol(project,file,names.getJSONObject(i),xml_writer);
        }
       xml_writer.end("FILE");
-
+   
       if (name_id != null) {
-	 if (xml_writer.getLength() > 1000000) {
-	    lsp_main.finishMessageWait(xml_writer,15000);
-	    LspLog.logD("OUTPUT NAMES: " + xml_writer.toString());
-	    xml_writer = null;
-	  }
+         if (xml_writer.getLength() > 1000000) {
+            lsp_main.finishMessageWait(xml_writer,15000);
+            LspLog.logD("OUTPUT NAMES: " + xml_writer.toString());
+            xml_writer = null;
+          }
        }
     }
 
@@ -555,6 +786,81 @@ void handleFindAll(String proj,String file,int start,int end,
    lbf.getProject().findAll(lbf,start,end,defs,refs,impls,type,ronly,wonly,xw);
 }
 
+
+/********************************************************************************/
+/*                                                                              */
+/*      Fully Qualified Name Query                                              */
+/*                                                                              */
+/********************************************************************************/
+
+void handleFullyQualifiedName(String proj,String file,int start,int end,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseFile lbf = findFile(proj,file);
+   if (lbf == null) throw new LspBaseException("File " + file + " not found");
+   
+   lbf.getProject().fullyQualifiedName(lbf,start,end,xw);
+}
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Find by Key query                                                       */
+/*                                                                              */
+/********************************************************************************/
+
+void handleFindByKey(String proj,String file,String key,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseFile lbf = findFile(proj,file);
+   if (lbf == null) throw new LspBaseException("File " + file + " not found");
+   
+   lbf.getProject().findByKey(lbf,key,xw);
+}
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Find Regions query                                                      */
+/*                                                                              */
+/********************************************************************************/
+
+void handleFindRegions(String proj,String bid,String file,String cls,
+      boolean prefix,boolean statics,boolean compunit,boolean imports,
+      boolean pkg,boolean topdecls,boolean fields,boolean all,
+      IvyXmlWriter xw)
+   throws LspBaseException
+{
+   if (file == null) {
+      // need to find file given class
+      throw new LspBaseException("File must be given for FINDREGIONS");
+    }
+   
+   LspBaseFile lbf = findFile(proj,file);
+   if (lbf == null) {
+      throw new LspBaseException("File " + file + " not found");
+    }
+   
+   lbf.findRegions(cls,prefix,statics,compunit,imports,pkg,topdecls,fields,all,xw);
+}
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      FINDPACKAGE command                                                     */
+/*                                                                              */
+/********************************************************************************/
+
+void handleFindPackage(String proj,String name,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspLog.logD("NEED TO FIND PACKAGE FOR " + name + " in " + proj);
+   LspBaseProject lbp = findProject(proj);
+   if (lbp == null) return;
+   
+}
 
 
 

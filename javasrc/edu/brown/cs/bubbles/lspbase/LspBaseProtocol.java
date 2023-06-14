@@ -107,7 +107,7 @@ LspBaseProtocol(File workspace,List<LspBasePathSpec> paths,LspBaseLanguageData l
 
    for_language = ld;
    client_id = ld.getName() + "_" + workspace.getName();
-   
+
    String rname = "lspbase-" + for_language.getName() + ".json";
    String json = null;
    try (InputStream ins = LspBaseProtocol.class.getClassLoader().getResourceAsStream(rname)) {
@@ -120,9 +120,10 @@ LspBaseProtocol(File workspace,List<LspBasePathSpec> paths,LspBaseLanguageData l
       for_language.setCapabilities(config_data.getJSONObject("lspbaseConfiguration"));
     }
    catch (Throwable e) {
-      LspLog.logE("Problem with capability json: " + e);
+      LspLog.logE("Problem with capability json: ",e);
+      System.exit(1);
     }
-   
+
    String command = ld.getExecString();
    Map<String,String> keys = new HashMap<>();
    keys.put("ID","LspBase_" + ld.getName() + "_" + workspace.getName());
@@ -154,18 +155,18 @@ LspBaseProtocol(File workspace,List<LspBasePathSpec> paths,LspBaseLanguageData l
 
 void addWorkspace(File ws,List<LspBasePathSpec> paths) {
    List<File> sources = new ArrayList<>();
-   
+
    for (LspBasePathSpec path : paths) {
       if (path.isExclude() || !path.isUser()) continue;
       File f = path.getFile();
       if (!source_roots.contains(f)) {
-         sources.add(f);
-         pathWorkspaceMap.put(getUri(f),ws);
+	 sources.add(f);
+	 pathWorkspaceMap.put(getUri(f),ws);
        }
     }
    List<LspBasePathSpec> oldpaths = workspacePathMap.get(ws);
    if (oldpaths == null) workspacePathMap.put(ws,new ArrayList<>(paths));
-   else oldpaths.addAll(paths); 
+   else oldpaths.addAll(paths);
 
    synchronized (this) {
       while (doing_initialization) {
@@ -260,15 +261,15 @@ private void handleInit(Object resp,JSONObject err)
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      JSON creation methods                                                   */
-/*                                                                              */
+/*										*/
+/*	JSON creation methods							*/
+/*										*/
 /********************************************************************************/
 
 JSONObject createRange(LspBaseFile file,int start,int end)
 {
    return createJson("start",createPosition(file,start),
-         "end",createPosition(file,end));
+	 "end",createPosition(file,end));
 }
 
 
@@ -292,6 +293,16 @@ void sendMessage(String method,LspResponder resp,Object ... params)
    sendJson(method,resp,obj);
 }
 
+
+String sendWorkMessage(String method,LspResponder resp,Object ... params)
+{
+   String tok = "WORK_" + progress_counter.getAndIncrement();
+   JSONObject obj = createJson(params);
+   obj.put("workDoneToken",tok);
+   sendJson(method,resp,obj);
+   return tok;
+}
+      
 
 void sendJson(String method,LspResponder resp,JSONObject params)
 {
@@ -353,7 +364,7 @@ private void localSendMessage(String method,LspResponder resp,boolean wait,JSONO
 private void localSendResponse(int id,Object result,JSONObject err)
 {
    if (id <= 0) return;
-   
+
    JSONObject jo = new JSONObject();
    jo.put("jsonrpc","2.0");
    jo.put("id",id);
@@ -367,9 +378,9 @@ private void localSendResponse(int id,Object result,JSONObject err)
    buf.append("\r\n");
    buf.append("\r\n");
    buf.append(cnts);
-   
+
    LspLog.logD("Send Response: " + id  + " " + jo.toString(2));
-   
+
    synchronized (message_stream) {
       try{
 	 message_stream.write(buf.toString());
@@ -408,27 +419,34 @@ void processReply(int id,Object cnts)
    if (cnts instanceof JSONObject) {
       JSONObject jcnts = (JSONObject) cnts;
       s = jcnts.toString(2);
-    }
+   }
    else if (cnts instanceof JSONArray) {
       JSONArray jcnts = (JSONArray) cnts;
       s = jcnts.toString(2);
-    }
+   }
    LspLog.logD("Reply: " + id + " " + (lsp != null) + " " + s);
-   
-   if (lsp != null) {
-      lsp.handleResponse(cnts,null);
+
+   try {
+      if (lsp != null) {
+	 lsp.handleResponse(cnts, null);
+      }
+   }
+   catch (Throwable t) {
+      LspLog.logE("Problem processing response",t);
     }
-   synchronized (this) {
-      pending_map.remove(id);
-      notifyAll();
-    }
+   finally {
+      synchronized (this) {
+	 pending_map.remove(id);
+	 notifyAll();
+      }
+   }
 }
 
 
 void processError(int id,JSONObject err)
 {
    LspLog.logE("Process Error " + err.toString(2));
-   
+
    LspResponder lsp = pending_map.remove(id);
    if (lsp != null) lsp.handleResponse(null,err);
 }
@@ -437,33 +455,36 @@ void processError(int id,JSONObject err)
 void processNotification(Integer id,String method,Object params)
 {
    JSONObject jparams = null;
- 
+
    String s = (params == null ? null : params.toString());
    if (params instanceof JSONObject) {
       jparams = (JSONObject) params;
       s = jparams.toString(2);
     }
-   LspLog.logD("Notification: " + method + " " + s);
-   
+   LspLog.logD("Notification: " + method + " " + id + " "+ s);
+
    Object result = null;
    switch (method) {
       case "workspace/configuration" :
-         result = handleWorkspaceConfiguration(id,jparams);
-         break;
+	 result = handleWorkspaceConfiguration(id,jparams);
+	 break;
       case "window/workDoneProgress/create" :
-         result = handleWorkDoneProgressCreate(id,jparams);
-         break;
+	 result = handleWorkDoneProgressCreate(id,jparams);
+	 break;
       case "$/progress" :
-         handleProgress(id,jparams);
-         break;
+	 handleProgress(id,jparams);
+	 break;
       case "textDocument/publishDiagnostics" :
-         handlePublishDiagnostics(id,jparams);
-         break;
+	 handlePublishDiagnostics(id,jparams);
+	 break;
+      case "window/logMessage" :
+	 handleLogMessage(id,jparams);
+	 break;
       default :
-         LspLog.logE("Unknown notification " + method);
-         break;
+	 LspLog.logE("Unknown notification " + method);
+	 break;
     }
-   
+
    localSendResponse(id,result,null);
 }
 
@@ -471,30 +492,30 @@ void processNotification(Integer id,String method,Object params)
 Object handleWorkspaceConfiguration(int id,JSONObject params)
 {
    JSONObject clientconfig = config_data.getJSONObject("clientConfiguration");
-   
+
    JSONArray items = params.getJSONArray("items");
    JSONArray result = new JSONArray();
    JSONArray exclude = new JSONArray();
    for (int i = 0; i < items.length(); ++i) {
       JSONObject itm = items.getJSONObject(i);
-      String scp = itm.optString("scopeUri");
+      String scp = itm.optString("scopeUri",null);
       String section = itm.optString("section");
       if (scp != null) {
-         File ws = pathWorkspaceMap.get(scp);
-         if (ws != null) {
-            for (LspBasePathSpec lbps : workspacePathMap.get(ws)) {
-               if (lbps.isExclude()) {
-                  String path = lbps.getFile().getPath();
-                  exclude.put(path);
-                }
-             }
-          }
+	 File ws = pathWorkspaceMap.get(scp);
+	 if (ws != null) {
+	    for (LspBasePathSpec lbps : workspacePathMap.get(ws)) {
+	       if (lbps.isExclude()) {
+		  String path = lbps.getFile().getPath();
+		  exclude.put(path);
+		}
+	     }
+	  }
        }
       JSONObject sectionconfig = clientconfig.optJSONObject(section);
       if (sectionconfig != null) addExcludes(sectionconfig,exclude);
       result.put(sectionconfig);
     }
-   
+
    return result;
 }
 
@@ -503,15 +524,15 @@ private void addExcludes(JSONObject obj,JSONArray exc)
 {
    for (String key : obj.keySet()) {
       switch (key) {
-         case "analysisExcludedFolder" :
-            obj.put(key,exc);
-            break;
-         default :
-            Object val = obj.get(key);
-            if (val instanceof JSONObject) {
-               addExcludes((JSONObject) val,exc);
-             }
-            break;
+	 case "analysisExcludedFolder" :
+	    obj.put(key,exc);
+	    break;
+	 default :
+	    Object val = obj.get(key);
+	    if (val instanceof JSONObject) {
+	       addExcludes((JSONObject) val,exc);
+	     }
+	    break;
        }
     }
 }
@@ -529,19 +550,29 @@ void handleProgress(int id,JSONObject params)
    String token = params.getString("token");
    JSONObject val = params.getJSONObject("value");
    LspLog.logD("PROGRESS VALUE " + val.toString(2));
-   
+
+   double pct = 0;
    String kind = val.getString("kind");
-   String ttl = val.optString("title");
-   
+   switch (kind) {
+      case "begin" :
+         pct = 0;
+         break;
+      case "end" :
+         pct = 1.0;
+         break;
+    }
+   String ttl = val.optString("title",null);
+
    kind = kind.toUpperCase();
    if (kind.equals("END")) kind = "DONE";
-   
+
    LspBaseMain lsp = LspBaseMain.getLspMain();
    IvyXmlWriter xw = lsp.beginMessage("PROGRESS");
    xw.field("KIND",kind.toUpperCase());
-   xw.field("TASK",ttl);
+   if (ttl != null) xw.field("TASK",ttl);
    xw.field("ID",token);
    xw.field("S",progress_counter.incrementAndGet());
+   xw.field("WORK",pct);
    lsp.finishMessage(xw);
 }
 
@@ -552,14 +583,26 @@ void handlePublishDiagnostics(int id,JSONObject params)
    String uri = params.getString("uri");
    LspBaseFile lbf = lsp.getProjectManager().findFile(null,uri);
    if (lbf == null) return;
-   
    int version = params.optInt("version",-1);
    JSONArray diags = params.getJSONArray("diagnostics");
+
+   IvyXmlWriter xw;
+   int pdx = uri.indexOf(PRIVATE_PREFIX);
+   if (pdx < 0) {
+      xw = lsp.beginMessage("FILEERROR");
+      if (version > 0) xw.field("ID",version);
+    }
+   else {
+      pdx += PRIVATE_PREFIX.length();
+      int pidx1 = uri.lastIndexOf(".");
+      String pid = uri.substring(pdx,pidx1);
+      xw = lsp.beginMessage("PRIVATEERROR");
+      xw.field("ID",pid);
+    }
    
-   IvyXmlWriter xw = lsp.beginMessage("FILEERROR");
    xw.field("PROJECT",lbf.getProject().getName());
    xw.field("FILE",lbf.getPath());
-   if (version > 0) xw.field("ID",version);
+   
    xw.begin("MESSAGES");
    for (int i = 0; i < diags.length(); ++i) {
       LspBaseUtil.outputDiagnostic(lbf,diags.getJSONObject(i),xw);
@@ -568,6 +611,27 @@ void handlePublishDiagnostics(int id,JSONObject params)
    lsp.finishMessage(xw);
 }
 
+
+void handleLogMessage(int id,JSONObject params)
+{
+   int type = params.getInt("type");
+   String msg = params.getString("message");
+   switch (type) {
+      case 1 :
+	 LspLog.logE("LSPPROTO: " + msg);
+	 break;
+      case 2 :
+	 LspLog.logW("LSPPROTO: " + msg);
+	 break;
+      case 3 :
+	 LspLog.logI("LSPPROTO: " + msg);
+	 break;
+      default : 
+      case 4 :
+	 LspLog.logD("LSPPROTO: " + msg);
+	 break;
+    }
+}
 
 
 
@@ -589,48 +653,48 @@ private class MessageReader extends Thread {
    @Override public void run() {
       int clen = -1;
       for ( ; ; ) {
-         try {
-            String ln = readline();
-            if (ln == null) break;
-            if (ln.length() == 0) {
-               if (clen > 0) {
-                  byte [] buf = new byte[clen];
-                  int rln = 0;
-                  while (rln < clen) {
-                     int mln = message_input.read(buf,rln,clen-rln);
-                     rln += mln;
-                   }
-                  String rslt = new String(buf,0,rln);
-                  JSONObject jobj = new JSONObject(rslt);
-   //             LspLog.logD("Received: " + clen + " " + rln + "::\n" + jobj.toString(2));
-                  process(jobj);
-                  clen = -1;
-                }
-             }
-            else {
-               int idx = ln.indexOf(":");
-               if (idx >= 0) {
-                  String key = ln.substring(0,idx).trim();
-                  String val = ln.substring(idx+1).trim();
-                  if (key.equalsIgnoreCase("Content-Length")) {
-                     clen = Integer.parseInt(val);
-                   }
-                }
-             }
-          }
-         catch (IOException e) { }
+	 try {
+	    String ln = readline();
+	    if (ln == null) break;
+	    if (ln.length() == 0) {
+	       if (clen > 0) {
+		  byte [] buf = new byte[clen];
+		  int rln = 0;
+		  while (rln < clen) {
+		     int mln = message_input.read(buf,rln,clen-rln);
+		     rln += mln;
+		   }
+		  String rslt = new String(buf,0,rln);
+		  JSONObject jobj = new JSONObject(rslt);
+   //		  LspLog.logD("Received: " + clen + " " + rln + "::\n" + jobj.toString(2));
+		  process(jobj);
+		  clen = -1;
+		}
+	     }
+	    else {
+	       int idx = ln.indexOf(":");
+	       if (idx >= 0) {
+		  String key = ln.substring(0,idx).trim();
+		  String val = ln.substring(idx+1).trim();
+		  if (key.equalsIgnoreCase("Content-Length")) {
+		     clen = Integer.parseInt(val);
+		   }
+		}
+	     }
+	  }
+	 catch (IOException e) { }
        }
     }
-   
+
    String readline() throws IOException {
       byte [] buf = new byte[10000];
       int ln = 0;
       int lastb = 0;
       for ( ; ; ) {
-         int b = message_input.read();
-         if (b == '\n' && lastb == '\r') break;
-         buf[ln++] = (byte) b;
-         lastb = b;
+	 int b = message_input.read();
+	 if (b == '\n' && lastb == '\r') break;
+	 buf[ln++] = (byte) b;
+	 lastb = b;
        }
       if (ln > 0 && buf[ln-1] == '\r') --ln;
       return new String(buf,0,ln);
@@ -638,22 +702,22 @@ private class MessageReader extends Thread {
 
    void process(JSONObject reply) {
       int id = reply.optInt("id");
-      String method = reply.optString("method");
+      String method = reply.optString("method",null);
       JSONObject err = reply.optJSONObject("error");
       if (err != null) {
-         processError(id,err);
+	 processError(id,err);
        }
       else if (id == 0 || pending_map.get(id) == null) {
-         if (method != null) {
-            Object params = reply.opt("params");
-            processNotification(id,method,params);
-          }
-         else {
-            LspLog.logE("Problem with message " + reply.toString(2));
-          }
+	 if (method != null) {
+	    Object params = reply.opt("params");
+	    processNotification(id,method,params);
+	  }
+	 else {
+	    LspLog.logE("Problem with message " + reply.toString(2));
+	  }
        }
       else {
-         processReply(id,reply.opt("result"));
+	 processReply(id,reply.opt("result"));
        }
     }
 

@@ -296,10 +296,12 @@ private LspBaseFile addLspFile(File file,boolean reload)
 void getAllNames(LspNamer namer)
 {
    for (LspBaseFile lbf : project_files) {
-      JSONObject tdi = createJson("uri",lbf.getUri());
-      use_protocol.sendMessage("textDocument/documentSymbol",
-	    new NameHandler(namer,this,lbf),
-	    "textDocument",tdi);
+      NameHandler nh = new NameHandler(namer,this,lbf);
+      nh.handleResponse(lbf.getSymbols(),null);
+//    JSONObject tdi = createJson("uri",lbf.getUri());
+//    use_protocol.sendMessage("textDocument/documentSymbol",
+// 	    new NameHandler(namer,this,lbf),
+// 	    "textDocument",tdi);
     }
 }
 
@@ -335,12 +337,14 @@ private class NameHandler implements LspResponder {
 /*										*/
 /********************************************************************************/
 
-void commit(String bid,boolean refresh,boolean save,List<Element> files,IvyXmlWriter xw)
+void commit(String bid,boolean refresh,
+      boolean save,boolean compile,
+      List<Element> files,IvyXmlWriter xw)
 {
    if (files == null || files.size() == 0) {
       for (LspBaseFile lbf : project_files) {
 	 if (refresh || !save || lbf.hasChanged()) {
-	    commitFile(lbf,bid,refresh,save,xw);
+	    commitFile(lbf,bid,refresh,save,compile,xw);
 	  }
        }
     }
@@ -351,32 +355,41 @@ void commit(String bid,boolean refresh,boolean save,List<Element> files,IvyXmlWr
 	 if (lbf != null) {
 	    boolean r = IvyXml.getAttrBool(e,"REFRESH",refresh);
 	    boolean s = IvyXml.getAttrBool(e,"SAVE",save);
-	    commitFile(lbf,bid,r,s,xw);
+            boolean c = IvyXml.getAttrBool(e,"COMPILE",compile);
+	    commitFile(lbf,bid,r,s,c,xw);
 	  }
        }
     }
 }
 
 
-private void commitFile(LspBaseFile lbf,String bid,boolean refresh,boolean save,IvyXmlWriter xw)
+private void commitFile(LspBaseFile lbf,String bid,
+      boolean refresh,boolean save,boolean compile,IvyXmlWriter xw)
 {
    boolean upd = false;
-
-   lbf.lockFile(bid);
-   try {
+   
+   if (xw != null) {
       xw.begin("FILE");
       xw.field("NAME",lbf.getPath());
+    }
+   
+   lbf.lockFile(bid);
+   try {
       try {
-	 upd = lbf.commit(refresh,save);
+	 upd = lbf.commit(refresh,save,compile);
        }
       catch (Throwable t) {
 	 xw.field("ERROR",t.toString());
        }
-      xw.end("FILE");
     }
    finally {
       lbf.unlockFile();
     }
+   
+   if (xw != null) {
+      xw.end("FILE");
+    }
+   
    if (upd) {
       // start autocompile
     }
@@ -405,7 +418,62 @@ void build(boolean refresh,boolean reload)
 	 findFiles(null,dir,reload);
        }
     }
+   
+   if (oldfiles != null) {
+      handleRefresh(oldfiles);
+    }
 }
+
+
+private void handleRefresh(Set<LspBaseFile> oldfiles)
+{
+   IvyXmlWriter xw = lsp_base.beginMessage("RESOURCE");
+   int ctr = 0;
+   for (LspBaseFile fd : project_files) {
+      LspBaseFile old = null;
+      for (LspBaseFile ofd : oldfiles) {
+         if (ofd.getFile().equals(fd.getFile())) {
+            old = ofd;
+            break;
+          }
+       }
+      if (old == null) {
+         outputDelta(xw,"ADDED",fd);
+         ++ctr;
+       }
+      else if (old.getFile().lastModified() != fd.getFile().lastModified()) {
+         oldfiles.remove(old);
+         outputDelta(xw,"CHANGED",fd);
+         ++ctr;
+       }
+      else {
+         oldfiles.remove(old);
+       }
+    }
+   for (LspBaseFile fd : oldfiles) {
+      outputDelta(xw,"REMOVED",fd);
+      ++ctr;
+    }
+   if (ctr > 0) {
+      lsp_base.finishMessage(xw);
+    }
+}
+
+
+
+private void outputDelta(IvyXmlWriter xw,String act,LspBaseFile ifd)
+{
+   xw.begin("DELTA");
+   xw.field("KIND",act);
+   xw.begin("RESOURCE");
+   xw.field("TYPE","FILE");
+   xw.field("PROJECT",project_name);
+   xw.field("LOCATION",ifd.getFile().getAbsolutePath());
+   xw.end("RESOURCE");
+   xw.end("DELTA");
+}
+
+
 
 
 /********************************************************************************/
@@ -418,7 +486,7 @@ void patternSearch(String pat,String typ,boolean defs,boolean refs,boolean syste
 {
    LspBasePatternResult sr = new LspBasePatternResult(this,pat,typ,system);
    String fpat = sr.getMatchPattern();
-   use_protocol.sendMessage("workspace/symbol",
+   use_protocol.sendWorkMessage("workspace/symbol",
 	 (Object data,JSONObject err) -> sr.addResult((JSONArray) data,err),
 	 "query",fpat);
 
@@ -444,69 +512,164 @@ void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolea
    LspBaseFindResult rslt = new LspBaseFindResult(this,file,defs,refs,
          impls,type,ronly,wonly);
    
-   use_protocol.sendMessage("textDocument/references",
-         (Object data,JSONObject err) -> rslt.addResults(data,err,"REFS"),
-        "textDocument",file.getTextDocumentId(),
-        "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()),
-        "context",createJson("includeDeclaration",defs));
-   
-   use_protocol.sendMessage("textDocument/documentHighlight",
-         (Object data,JSONObject err) -> rslt.addResults(data,err,"HIGH"),
-         "textDocument",file.getTextDocumentId(),
-         "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
-   
-   if (getLanguageData().getCapability("declarationProvider") != null) {
-      use_protocol.sendMessage("textDocument/declaration",
-         (Object data,JSONObject err) -> rslt.addResults(data,err,"DECL"),
-         "textDocument",file.getTextDocumentId(),
-         "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
+   if (refs) {
+      use_protocol.sendWorkMessage("textDocument/references",
+            (Object data,JSONObject err) -> rslt.addResults(data,err,"REFS"),
+            "textDocument",file.getTextDocumentId(),
+            "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()),
+            "context",createJson("includeDeclaration",defs));
     }
    
+   if (ronly || wonly) {
+      use_protocol.sendWorkMessage("textDocument/documentHighlight",
+            (Object data,JSONObject err) -> rslt.addResults(data,err,"HIGH"),
+            "textDocument",file.getTextDocumentId(),
+            "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
+    }
+   
+   if (!type) {
+      if (getLanguageData().getCapability("declarationProvider") != null) {
+         use_protocol.sendWorkMessage("textDocument/declaration",
+               (Object data,JSONObject err) -> rslt.addResults(data,err,"DECL"),
+               "textDocument",file.getTextDocumentId(),
+               "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
+       }
+      
+      use_protocol.sendWorkMessage("textDocument/definition",
+            (Object data,JSONObject err) -> rslt.addResults(data,err,"DEFS"),
+            "textDocument",file.getTextDocumentId(),
+            "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
+    }
+   else {
+      use_protocol.sendWorkMessage("textDocument/typeDefinition",
+            (Object data,JSONObject err) -> rslt.addResults(data,err,"TYPE"),
+            "textDocument",file.getTextDocumentId(),
+            "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn())); 
+    }
+   
+   if (impls) {
+      // might need to be done before definitions?
+      use_protocol.sendWorkMessage("textDocument/implementation",
+            (Object data,JSONObject err) -> rslt.addResults(data,err,"IMPL"),
+            "textDocument",file.getTextDocumentId(),
+            "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn())); 
+    }
+   
+   List<FindResult> rslts = rslt.getResults();
+   if (rslts.isEmpty()) return;
+   JSONObject def = null;
+   for (FindResult symloc : rslts) {
+      def = symloc.getDefinition();
+      if (def != null) break;
+    }
+   if (def != null) {
+      xw.begin("SEARCHFOR");
+      int kind = def.getInt("kind");
+      switch (SymbolKinds[kind]) {
+         case "Field" :
+         case "Variable" :
+         case "Property" :
+         case "EnumMember" :
+            xw.field("TYPE","Field");
+            break;
+         case "Local" :
+            xw.field("TYPE","Local");
+            break;
+         case "Function" :
+         case "Constructor" :
+         case "Method" :
+            xw.field("TYPE","Function");
+            break;
+         case "Class" :
+         case "Enum" :
+         case "Interface" :
+         case "Struct" :
+            xw.field("TYPE","Class");
+            break;
+       }
+      xw.text(def.getString("name"));
+      xw.end("SEARCHFOR");
+    }
+   for (FindResult symloc : rslts) {
+      LspLog.logD("OUTPUT "  + symloc.getFile().getPath() + " " +
+            symloc.getRange() + " " + symloc.getDefinition());
+      // output result
+      LspBaseUtil.outputFindResult(symloc,xw);
+    }
+}
+
+
+
+
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Fully qualified name query                                              */
+/*                                                                              */
+/********************************************************************************/
+
+void fullyQualifiedName(LspBaseFile file,int start,int end,IvyXmlWriter xw)
+{
+   LineCol lc = file.mapOffsetToLineColumn(start);
+   LspBaseFindResult rslt = new LspBaseFindResult(this,file,true,false,
+         false,false,false,false);
    use_protocol.sendMessage("textDocument/definition",
          (Object data,JSONObject err) -> rslt.addResults(data,err,"DEFS"),
          "textDocument",file.getTextDocumentId(),
-         "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn())); 
-  
-   use_protocol.sendMessage("textDocument/typeDefinition",
-         (Object data,JSONObject err) -> rslt.addResults(data,err,"TYPE"),
-         "textDocument",file.getTextDocumentId(),
-         "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn())); 
-   
-   use_protocol.sendMessage("textDocument/implementation",
-         (Object data,JSONObject err) -> rslt.addResults(data,err,"IMPL"),
-         "textDocument",file.getTextDocumentId(),
-         "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn())); 
-   
-   List<JSONObject> rslts = rslt.getResults();
-   if (rslts.isEmpty()) return;
-   for (JSONObject symloc : rslts) {
-      LspLog.logD("OUTPUT "  + symloc);
-      // output result
-    }
-   
-   System.err.println("DONE FIND ALL:");
-}
-
-
-
-private void findLocation(Object data,JSONObject err,String flags)
-{
-   List<JSONObject> rslts = new ArrayList<>();
-   if (data instanceof JSONArray) {
-      JSONArray jarr = (JSONArray) data;
-      for (Object o : jarr.toList()) {
-         rslts.add((JSONObject) o);
+         "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
+   for (FindResult fr : rslt.getResults()) {
+      JSONObject def = fr.getDefinition();
+      if (def != null) {
+         xw.begin("FULLYQUALIFIEDNAME");
+         String nm = def.getString("name");
+         String pfx = def.optString("prefix",null);
+         if (pfx != null) nm = pfx + "." + nm;
+         xw.field("NAME",nm);
+         String det = def.optString("detail",null);
+         if (det != null) xw.field("TYPE",det);
+         xw.end("FULLYQUALIFIEDNAME");
+         break;
        }
     }
-   else if (data instanceof JSONObject) {
-      rslts.add((JSONObject) data);
-    }
-   for (JSONObject rslt : rslts) {
-      
-    }
 }
 
 
+/********************************************************************************/
+/*                                                                              */
+/*      Find by key query                                                       */
+/*                                                                              */
+/********************************************************************************/
+
+void findByKey(LspBaseFile lbf,String key,IvyXmlWriter xw)
+{
+   String proj = null;
+   int idx = key.indexOf(":");
+   if (idx > 0) {
+      proj = key.substring(0,idx);
+      key = key.substring(idx+1);
+    }
+   String filpfx = null;
+   idx = key.indexOf("#");
+   if (idx > 0) {
+      filpfx = key.substring(0,idx);
+      key = key.substring(idx+1);
+    }
+   LspLog.logD("CHECK KEY " + filpfx + " " + lbf.getPath() + " " + proj + " " + getName());
+   
+   JSONArray syms = lbf.getSymbols();
+   for (int i = 0; i < syms.length(); ++i) {
+      JSONObject sym = syms.getJSONObject(i);
+      String pfx = sym.optString("prefix",null);
+      String nm = sym.getString("name");
+      if (pfx != null) nm = pfx + "." + nm;
+      if (nm.equals(key)) {
+         LspBaseUtil.outputLspSymbol(this,lbf,sym,xw);
+         break;
+       }
+    }
+}
 
 
 
@@ -532,40 +695,30 @@ private void openFileResponse(Object resp,JSONObject err)
 
 
 
-void editFile(LspBaseFile lbf,List<LspBaseEdit> edits)
-{
-   JSONArray changes = new JSONArray();
-   for (LspBaseEdit ed : edits) {
-      LineCol lc0 = lbf.mapOffsetToLineColumn(ed.getOffset());
-      LineCol lc1 = lbf.mapOffsetToLineColumn(ed.getOffset() + ed.getLength());
-      JSONObject rng = createJson("start",createJson("line",lc0.getLine(),"character",lc0.getColumn()),
-	    "end",createJson("line",lc1.getLine(),"character",lc1.getColumn()));
-      JSONObject chng = createJson("range",rng,"text",ed.getText());
-      changes.put(chng);
-    }
-   use_protocol.sendMessage("textDocument/didChange",null,
-	 "textDocument",lbf.getTextDocumentId(),"contentChanges",changes);
-}
+
 
 void willSaveFile(LspBaseFile lbf)
 {
-   use_protocol.sendMessage("textDocument/willSave",null,
-	 "textDocument",lbf.getTextDocumentId(),"reason",1);
-	
+   if (lbf.getLanguageData().getCapabilityBool("textDocumentSync.willSave")) {
+      use_protocol.sendMessage("textDocument/willSave",null,
+            "textDocument",lbf.getTextDocumentId(),"reason",1);
+    }
 }
 
 
 
 void saveFile(LspBaseFile lbf)
-{
-   use_protocol.sendMessage("textDocument/didSave",null,
-	 "textDocument",lbf.getTextDocumentId());
+{ 
+   if (lbf.getLanguageData().getCapabilityBool("textDocumentSync.Save")) {
+      use_protocol.sendMessage("textDocument/didSave",null,
+            "textDocument",lbf.getTextDocumentId());
+    }
 }
 
 
 void closeFile(LspBaseFile lbf)
 {
-   use_protocol.sendMessage("textDOcument/didClose",null,
+   use_protocol.sendMessage("textDocument/didClose",null,
 	 "textDocument",lbf.getTextDocumentId());
 }
 

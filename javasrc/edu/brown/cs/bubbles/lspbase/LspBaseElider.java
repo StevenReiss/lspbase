@@ -62,8 +62,7 @@ private LspBaseFile for_file;
 
 private String [] token_types;
 private String [] token_modifiers;
-private static final String TOKEN_TYPES = "semanticTokensProvider.legend.tokenTypes";
-private static final String TOKEN_MODS = "semanticTokensProvider.legend.tokenModifiers";
+
 
 private static double DOWN_PRIORITY = 0.90;
 private static double CHILD_PRIORITY = 0.98;
@@ -147,17 +146,18 @@ boolean computeElision(IvyXmlWriter xw)
    
    LspBaseProject lbp = for_file.getProject();
    LspBaseProtocol proto = lbp.getProtocol();
-   proto.sendMessage("textDocument/foldingRange",
+   proto.sendWorkMessage("textDocument/foldingRange",
          (Object resp,JSONObject err) -> handleFolds(data,resp,err),
          "textDocument",for_file.getTextDocumentId());
    
-   proto.sendMessage("textDocument/documentSymbol",
-         (Object resp,JSONObject err) -> handleDecls(data,resp,err),
-         "textDocument",for_file.getTextDocumentId());
+   handleDecls(data,for_file.getSymbols(),null);
+// proto.sendMessage("textDocument/documentSymbol",
+//       (Object resp,JSONObject err) -> handleDecls(data,resp,err),
+//       "textDocument",for_file.getTextDocumentId());
    
    List<ElideRange> ranges = data.getRanges();
    for (ElideRange range : ranges) {
-      proto.sendMessage("textDocument/semanticTokens/range",
+      proto.sendWorkMessage("textDocument/semanticTokens/range",
             (Object resp,JSONObject err) -> handleTokens(data,range,resp,err),
             "textDocument",for_file.getTextDocumentId(),
             "range",proto.createRange(for_file,range.getStartOffset(),
@@ -533,11 +533,7 @@ private static class ElideNode implements Comparable<ElideNode> {
       return (start_offset <= node.start_offset && end_offset >= node.end_offset);
     }
    
-   boolean overlaps(int soff,int eoff) {
-      if (start_offset >= eoff) return false;
-      if (end_offset <= soff) return false;
-      return true;
-    }
+   
    
    void addChild(ElideNode cn) {
       if (child_nodes == null) child_nodes = new TreeSet<>();

@@ -1,21 +1,21 @@
 /********************************************************************************/
-/*                                                                              */
-/*              LspBaseTest.java                                                */
-/*                                                                              */
-/*      Test Driver for LSP Base                                                */
-/*                                                                              */
+/*										*/
+/*		LspBaseTest.java						*/
+/*										*/
+/*	Test Driver for LSP Base						*/
+/*										*/
 /********************************************************************************/
-/*      Copyright 2011 Brown University -- Steven P. Reiss                    */
+/*	Copyright 2011 Brown University -- Steven P. Reiss		      */
 /*********************************************************************************
- *  Copyright 2011, Brown University, Providence, RI.                            *
- *                                                                               *
- *                        All Rights Reserved                                    *
- *                                                                               *
- * This program and the accompanying materials are made available under the      *
+ *  Copyright 2011, Brown University, Providence, RI.				 *
+ *										 *
+ *			  All Rights Reserved					 *
+ *										 *
+ * This program and the accompanying materials are made available under the	 *
  * terms of the Eclipse Public License v1.0 which accompanies this distribution, *
- * and is available at                                                           *
- *      http://www.eclipse.org/legal/epl-v10.html                                *
- *                                                                               *
+ * and is available at								 *
+ *	http://www.eclipse.org/legal/epl-v10.html				 *
+ *										 *
  ********************************************************************************/
 
 
@@ -40,7 +40,7 @@ import edu.brown.cs.ivy.mint.MintMessage;
 import edu.brown.cs.ivy.xml.IvyXml;
 import edu.brown.cs.ivy.xml.IvyXmlWriter;
 
-public class LspBaseTest implements LspBaseConstants, MintConstants   
+public class LspBaseTest implements LspBaseConstants, MintConstants
 {
 
 
@@ -53,14 +53,14 @@ public class LspBaseTest implements LspBaseConstants, MintConstants
 public static void main(String [] args)
 {
    LspBaseTest nt = new LspBaseTest(args);
-   
+
    nt.runTest();
-   
+
    try {
-      Thread.sleep(10000);
+      Thread.sleep(3000);
     }
    catch (InterruptedException e) { }
-   
+
    nt.sendCommand("EXIT",null,null,null);
 }
 
@@ -73,9 +73,8 @@ public static void main(String [] args)
 
 private MintControl	mint_control;
 private String		instance_id;
-private int		edit_id;
 private Element 	last_runevent;
-private String          last_endnames;
+private String		last_endnames;
 
 
 
@@ -90,7 +89,6 @@ private LspBaseTest(String [] args)
    mint_control = MintControl.create("LSPBASETEST",MintSyncMode.ONLY_REPLIES);
    mint_control.register("<LSPBASE TYPE='_VAR_0' />",new MessageHandler());
    instance_id = "LSPBASE_id";
-   edit_id = 1;
    last_runevent = null;
    last_endnames = null;
 }
@@ -107,13 +105,14 @@ private void runTest()
 {
    setupFiles();
    setupProject();
-   
+
    start();
-   
+
    String proj = "alds";
    String ws = "/Users/spr/Lsp/test";
    String fil = "/pro/iot/flutter/alds/lib/main.dart";
-   
+   int editid = 1;
+
    sendCommand("PING",null,null,null);
    sendCommand("ENTER",null,null,null);
    sendCommand("LOGLEVEL",null,new CommandArgs("LEVEL","DEBUG"),null);
@@ -122,54 +121,143 @@ private void runTest()
    sendCommand("PROJECTS",null,null,null);
    sendCommand("PROJECTS",null,new CommandArgs("WS",ws),null);
    sendCommand("BUILDPROJECT",proj,
-         new CommandArgs("REFRESH",false,"CLEAN",false,"FULL",false,"WS",ws),null);
+	 new CommandArgs("REFRESH",false,"CLEAN",false,"FULL",false,"WS",ws),null);
    sendCommand("GETALLBREAKPOINTS",null,null,null);
    sendCommand("GETRUNCONFIG",null,null,null);
    sendCommand("GETALLNAMES",null,
-         new CommandArgs("BACKGROUND","NAME_1234"),null);
+	 new CommandArgs("BACKGROUND","NAME_1234"),null);
    waitForNames();
-   sendCommand("PROJECTS",null,new CommandArgs("WS",ws),null); 
+   sendCommand("PROJECTS",null,new CommandArgs("WS",ws),null);
    sendCommand("OPENPROJECT",proj,
-         new CommandArgs("PATHS",true),null);
+	 new CommandArgs("PATHS",true),null);
    sendCommand("PATTERNSEARCH",proj,
-         new CommandArgs("PATTERN","main.dart;initialize()","DEFS",true,"REFS",false,
-               "FOR","METHOD"),null);
+	 new CommandArgs("PATTERN","main.dart;initialize()","DEFS",true,"REFS",false,
+	       "FOR","METHOD"),null);
    sendCommand("EDITPARAM",null,
-         new CommandArgs("NAME","AUTOELIDE","VALUE",true),null);
+	 new CommandArgs("NAME","AUTOELIDE","VALUE",true),null);
    sendCommand("EDITPARAM",null,
-         new CommandArgs("NAME","ELIDEDELAY","VALUE",250),null);    
+	 new CommandArgs("NAME","ELIDEDELAY","VALUE",1000),null);
    sendCommand("ELIDESET",proj,
-         new CommandArgs("FILE",fil,"COMPUTE",true),
-         "<REGION START='1993' END='2392' />");
+	 new CommandArgs("FILE",fil,"COMPUTE",true),
+	 "<REGION START='1993' END='2392' />");
    sendCommand("ELIDESET",proj,
-         new CommandArgs("FILE",fil,"COMPUTE",true),null);
+	 new CommandArgs("FILE",fil,"COMPUTE",true),null);
    sendCommand("STARTFILE",proj,
-         new CommandArgs("FILE",fil,"ID",2),null);
+	 new CommandArgs("FILE",fil,"ID",2),null);
    lookupPoint(proj,fil,2154);
    lookupPoint(proj,fil,2114);
    lookupPoint(proj,fil,2120);
    sendCommand("COMMIT",proj,
-         new CommandArgs("SAVE",true),null);
+	 new CommandArgs("SAVE",true),null);
+   sendCommand("COMMIT",proj,
+	 new CommandArgs("COMPILE",true),null);
+   
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2106),null);
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2165),null);
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2145),null);
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",1990),null);
+
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2563),null);
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2611),null);
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2644),null);
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2659),null);
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2695),null);
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2736),null);
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2741),null);
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2775),null);
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2816),null);
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2866),null);
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2904),null);
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2922),null);
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2936),null);
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2945),null);
+// sendCommand("INDENT",proj,
+// 	 new CommandArgs("FILE",fil,"ID",editid++,"OFFSET",2217,"SPLIT",true),null);
+   sendCommand("FINDREGIONS",proj,
+         new CommandArgs("FILE",fil,"ALL",true),null);
+   sendCommand("FINDREGIONS",proj,
+         new CommandArgs("FILE",fil,"FIELDS",true),null);
+   sendCommand("FINDREGIONS",proj,
+         new CommandArgs("FILE",fil,"COMPUNIT",true),null);
+   sendCommand("FINDREGIONS",proj,
+         new CommandArgs("FILE",fil,"PREFIX",true),null);
+   sendCommand("FINDREGIONS",proj,
+         new CommandArgs("FILE",fil,"STATICS",true),null);
+   sendCommand("FINDREGIONS",proj,
+         new CommandArgs("FILE",fil,"IMPORTS",true,"PACKAGE",true,"TOPDECLS",true),
+         null); 
+   
+   sendCommand("GETCOMPLETIONS",proj,
+         new CommandArgs("FILE",fil,"OFFSET",2026),null);
+   sendCommand("CREATEPRIVATE",proj,
+         new CommandArgs("FILE",fil,"PID","test12345"),null);
+   sendCommand("PRIVATEEDIT",proj,
+         new CommandArgs("FILE",fil,"PID","test12345"),
+         "<EDIT START='2035' END='2035'><![CDATA[garbage inserted]]></EDIT>");
+   sendCommand("REMOVEPRIVATE",proj,
+         new CommandArgs("FILE",fil,"PID","test12345"),null);
+   
+   sendCommand("EDITFILE",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++),
+	 "<EDIT START='2035' END='2037' />");
+   delay(2000);
+   
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid,"OFFSET",2041),null);
+   sendCommand("EDITFILE",proj,
+	 new CommandArgs("FILE",fil,"ID",editid++),
+	 "<EDIT START='2035' END='2035'><![CDATA[    ]]></EDIT>");
+   delay(2000);
+   
+   sendCommand("INDENT",proj,
+	 new CommandArgs("FILE",fil,"ID",editid,"OFFSET",2041),null);
+   sendCommand("FIXINDENTS",proj,
+         new CommandArgs("FILE",fil,"ID",editid,"OFFSET",2041),null);
+   
+   sendCommand("COMMIT",proj,
+	 new CommandArgs("REFRESH",true),null);
+   
+   sendCommand("ELIDESET",proj,
+	 new CommandArgs("FILE",fil,"COMPUTE",true),
+	 "<REGION START='0' END='2946' />");
    sendCommand("SAVEWORKSPACE",null,
-         new CommandArgs("WS",ws),null);
+	 new CommandArgs("WS",ws),null);
 }
 
 private void lookupPoint(String proj,String fil,int where)
 {
    sendCommand("FINDREFERENCES",proj,
-         new CommandArgs("FILE",fil,"START",where,"END",where,"RONLY",true,
-               "EXACT",true,"EQUIV",true),null);
+	 new CommandArgs("FILE",fil,"START",where,"END",where,"RONLY",true,
+	       "EXACT",true,"EQUIV",true),null);
    sendCommand("FINDREFERENCES",proj,
-         new CommandArgs("FILE",fil,"START",where,"END",where,"RONLY",true,
-               "EXACT",true,"EQUIV",true),null);
+	 new CommandArgs("FILE",fil,"START",where,"END",where,"RONLY",true,
+	       "EXACT",true,"EQUIV",true),null);
    sendCommand("FINDREFERENCES",null,
-         new CommandArgs("FILE",fil,"START",where,"END",where,"WONLY",true,
-               "EXACT",true,"EQUIV",true),null);
+	 new CommandArgs("FILE",fil,"START",where,"END",where,"WONLY",true,
+	       "EXACT",true,"EQUIV",true),null);
    sendCommand("FINDDEFINITIONS",null,
-         new CommandArgs("FILE",fil,"START",where,"END",where),null);
+	 new CommandArgs("FILE",fil,"START",where,"END",where),null);
    sendCommand("GETFULLYQUALIFIEDNAME",null,
-         new CommandArgs("FILE",fil,"START",where,"END",where),null);
-   
+	 new CommandArgs("FILE",fil,"START",where,"END",where),null);
+
 }
 
 
@@ -219,10 +307,10 @@ private void waitForNames()
 {
    synchronized (this) {
       while (last_endnames == null) {
-         try {
-            wait(1000);
-          }
-         catch (InterruptedException e) { }
+	 try {
+	    wait(1000);
+	  }
+	 catch (InterruptedException e) { }
        }
       last_endnames = null;
     }
@@ -231,15 +319,15 @@ private void waitForNames()
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      File methods                                                            */
-/*                                                                              */
+/*										*/
+/*	File methods								*/
+/*										*/
 /********************************************************************************/
 
 private void setupFiles()
 {
    String home = System.getProperty("user.home");
-   
+
    try {
       IvyFile.remove(home + "/Lsp/test/alds");
       IvyFile.remove(home + "/Lsp/test/Track");
@@ -260,21 +348,21 @@ private void setupProject()
    File pdirf = new File(pdir);
    pdirf.mkdirs();
    File ppfile = new File(pdirf,PROJECT_DATA_FILE);
-   
+
    String pdef = "<PROJECTS>\n" +
-         "<PROJECT NAME='alds' PATH='/Users/spr/Lsp/test/alds' />\n" +
-         "</PROJECTS>\n";
-   
+	 "<PROJECT NAME='alds' PATH='/Users/spr/Lsp/test/alds' />\n" +
+	 "</PROJECTS>\n";
+
    String tdef = "<PROJECT LANGUAGE='dart' NAME='alds' BASE='/Users/spr/Lsp/test/alds'>\n" +
-               "<PATH SOURCE='/pro/iot/flutter/alds' TYPE='INCLUDE' NEST='true' />\n" +
-               "<PATH SOURCE='**/bBACKUP' TYPE='EXCLUDE' />\n" +
-               "</PROJECT>";
-   
+	       "<PATH SOURCE='/pro/iot/flutter/alds' TYPE='INCLUDE' NEST='true' />\n" +
+	       "<PATH SOURCE='**/bBACKUP' TYPE='EXCLUDE' />\n" +
+	       "</PROJECT>";
+
    try (PrintWriter pw = new PrintWriter(new FileWriter(pfile))) {
       pw.println(pdef);
     }
    catch (IOException e) { }
-   
+
    try (PrintWriter pw = new PrintWriter(new FileWriter(ppfile))) {
       pw.println(tdef);
     }
@@ -303,7 +391,7 @@ private void start()
 	 catch (InterruptedException e) { }
        }
       if (!tryPing()) {
-         LspLog.logE("LSPBASETEST: Starting failed");
+	 LspLog.logE("LSPBASETEST: Starting failed");
        }
     }
 }
@@ -312,25 +400,25 @@ private void start()
 
 
 private class Runner extends Thread {
-   
+
    Runner() {
       super("LspBaseRunnerThread");
     }
-   
+
    @Override public void run() {
       try {
-         LspLog.logI("LSPBASETEST: Begin");
-         LspBaseMain.main(new String [] { "-m", "LSPBASETEST", "-ws", "/Users/spr/Lsp/test",
-               "-log", "/pro/lspbase/lspbase/src/test.log"});
-         LspLog.logI("LSPBASETEST: Start run");
+	 LspLog.logI("LSPBASETEST: Begin");
+	 LspBaseMain.main(new String [] { "-m", "LSPBASETEST", "-ws", "/Users/spr/Lsp/test",
+	       "-log", "/pro/lspbase/lspbase/src/test.log"});
+	 LspLog.logI("LSPBASETEST: Start run");
        }
       catch (Throwable t) {
-         LspLog.logE("LSPBASETEST: Error running: " + t);
-         t.printStackTrace();
+	 LspLog.logE("LSPBASETEST: Error running: " + t);
+	 t.printStackTrace();
        }
       LspLog.logI("LSPBASETEST: Finish run");
     }
-   
+
 }	// end of inner class Runner
 
 
@@ -346,7 +434,7 @@ private ReplyHandler sendCommand(String cmd,String proj,CommandArgs args,String 
 {
    ReplyHandler rh = new ReplyHandler(cmd);
    String msg = null;
-   
+
    try (IvyXmlWriter xw = new IvyXmlWriter()) {
       xw.begin("BUBBLES");
       xw.field("DO",cmd);
@@ -354,27 +442,27 @@ private ReplyHandler sendCommand(String cmd,String proj,CommandArgs args,String 
       xw.field("BID",instance_id);
       if (proj != null) xw.field("PROJECT",proj);
       if (args != null) {
-         for (Map.Entry<String,Object> ent : args.entrySet()) {
+	 for (Map.Entry<String,Object> ent : args.entrySet()) {
 	    xw.field(ent.getKey(),ent.getValue());
 	  }
        }
       if (cnts != null) xw.xmlText(cnts);
       xw.end("BUBBLES");
       msg = xw.toString();
-      
+
     }
-   
+
    LspLog.logI("LSPBASETEST: BEGIN COMMAND " + cmd);
    LspLog.logI("LSPBASETEST: SENDING: " + msg);
-   
+
    synchronized (this) {
       last_runevent = null;
     }
-   
+
    mint_control.send(msg,rh,MINT_MSG_FIRST_NON_NULL);
-   
+
    rh.print();
-   
+
    return rh;
 }
 
@@ -395,32 +483,32 @@ private boolean tryPing()
 /********************************************************************************/
 
 private static class ReplyHandler extends MintDefaultReply {
-   
+
    private String cmd_name;
    private String result_value;
-   
+
    ReplyHandler(String what) {
       cmd_name = what;
     }
-   
+
    void print() {
       String rslt = waitForString();
       result_value = rslt;
       if (rslt == null) {
-         LspLog.logI("LSPBASETEST: No reply for " + cmd_name);
+	 LspLog.logI("LSPBASETEST: No reply for " + cmd_name);
        }
       else {
-         LspLog.logI("LSPBASETEST: Reply for " + cmd_name + ":");
-         LspLog.logI(rslt);
-         LspLog.logI("LSPBASETEST: End of reply");
+	 LspLog.logI("LSPBASETEST: Reply for " + cmd_name + ":");
+	 LspLog.logI(rslt);
+	 LspLog.logI("LSPBASETEST: End of reply");
        }
     }
-  
+
    @SuppressWarnings("unused")
    String getResult() {
-      return result_value; 
+      return result_value;
     }
-   
+
 }	// end of inner class ReplyHandler
 
 
@@ -432,7 +520,7 @@ private static class ReplyHandler extends MintDefaultReply {
 /********************************************************************************/
 
 private class MessageHandler implements MintHandler {
-   
+
    @Override public void receive(MintMessage msg,MintArguments args) {
       LspLog.logI("LSPBASETEST: Message from LSPBASE:");
       LspLog.logI(msg.getText());
@@ -440,31 +528,31 @@ private class MessageHandler implements MintHandler {
       Element xml = msg.getXml();
       LspBaseTest test = LspBaseTest.this;
       synchronized (test) {
-         switch (IvyXml.getAttrString(xml,"TYPE")) {
-            case "RUNEVENT" :
-               Element re = IvyXml.getChild(xml,"RUNEVENT");
-               String kind = IvyXml.getAttrString(re,"KIND");
-               if (kind.equals("RESUME") || kind.equals("SUSPEND")) {
-                  test.last_runevent = re;
-                  test.notifyAll();
-                }
-               break;
-            case "ENDNAMES" :
-               String nid = IvyXml.getAttrString(xml,"NID");
-               test.last_endnames = nid;
-               break;
-          }
+	 switch (IvyXml.getAttrString(xml,"TYPE")) {
+	    case "RUNEVENT" :
+	       Element re = IvyXml.getChild(xml,"RUNEVENT");
+	       String kind = IvyXml.getAttrString(re,"KIND");
+	       if (kind.equals("RESUME") || kind.equals("SUSPEND")) {
+		  test.last_runevent = re;
+		  test.notifyAll();
+		}
+	       break;
+	    case "ENDNAMES" :
+	       String nid = IvyXml.getAttrString(xml,"NID");
+	       test.last_endnames = nid;
+	       break;
+	  }
        }
       msg.replyTo();
     }
-   
+
 }	// end of inner class MessageHandler
 
 
 
 
 
-}       // end of class LspBaseTest
+}	// end of class LspBaseTest
 
 
 

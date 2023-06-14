@@ -89,7 +89,7 @@
 	      "valueSet" : [ 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26 ]
 	    },
 	   "contextSupport" : false,
-	   "insertTextMode" : 2,
+	   "insertTextMode" : 1,
 	   "completionList" : {
 	      itemDefaults: [ ]
 	    }
@@ -189,7 +189,7 @@
 	  "tagSupport" : {
 	     "valueSet" : [ 1, 2 ]
 	   },
-	  "versionSupport" : false,
+	  "versionSupport" : true,
 	  "codeDescriptionSupport" : true,
 	  "dataSupport" : true
 	},
@@ -223,15 +223,16 @@
 			   "typeParameter", "parameter", "variable", "property", "enumMember",
 			   "event", "function", "method", "macro", "keyword", "modifier",
 			   "comment", "string", "number", "regexp", "operator",
-			   "decorator", "annotation","namespace","boolean" ],
+			   "decorator", "annotation","namespace","boolean", "package" ],
 	  "tokenModifiers" : [ "documentation", "constructor", "declaration", "importPrefix",
 			"instance", "static", "escape", "annotation", "control", "label",
-			"interpolation", "void" ],
+			"interpolation", "void", "defaultLibrary", "modification", "async",
+			"abstract", "deptrecated", "readonly", "definition" ],
 	  "formats" : [ "relative" ],
 	  "overlappingTokenSupport" : false,
 	  "multilineTokenSupport" : true,
 	  "serverCancelSupport" : false,
-	  "augmentsSyntaxTokens" : false
+	  "augmentsSyntaxTokens" : true
 	},
        "moniker" : {
 	  "dynamicRegistration" : false
@@ -248,7 +249,7 @@
 	     "properties" : []
 	   }
 	},
-       "diagnostics" : {
+       "diagnostic" : {
 	  "dynamicRegistration" : false,
 	  "relatedDocumentSupport" : true
 	}
