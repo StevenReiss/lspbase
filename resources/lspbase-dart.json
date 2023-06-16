@@ -273,7 +273,7 @@
        },
      "general" : {
 	"staleRequestSupport" : {
-	   "cancel" : false,
+	   "cancel" : true,
 	   "retryOnContentModified" : [ ]
 	  },
 	"regularExpressions" : {

@@ -623,9 +623,10 @@ void fullyQualifiedName(LspBaseFile file,int start,int end,IvyXmlWriter xw)
       JSONObject def = fr.getDefinition();
       if (def != null) {
          xw.begin("FULLYQUALIFIEDNAME");
+         String fpfx = getRelativeFile(file);
          String nm = def.getString("name");
          String pfx = def.optString("prefix",null);
-         if (pfx != null) nm = pfx + "." + nm;
+         if (pfx != null) nm = fpfx + ";" + pfx + "." + nm;
          xw.field("NAME",nm);
          String det = def.optString("detail",null);
          if (det != null) xw.field("TYPE",det);

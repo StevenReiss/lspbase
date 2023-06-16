@@ -197,7 +197,7 @@ void handleFolds(ElideData data,Object resp,JSONObject err)
             break;
        }
       ElideNode en = data.addNode(soff,eoff);
-      en.setNodeType(typ);
+      if (typ != null) en.setNodeType(typ);
     }
 }
 
@@ -228,9 +228,11 @@ private void handleDecl(ElideData data,JSONObject decl)
    
    ElideNode en = data.addNode(soff,eoff);
    en.setNodeType(ntype);
+   // TODO:  get File prefix and add it to name
    String name = decl.getString("name");
    String det = decl.optString("detail","");
-   en.setSymbolName(name + det);
+   String fpfx = for_file.getProject().getRelativeFile(for_file);
+   en.setSymbolName(fpfx + ";" + name + det);
 }
 
 
@@ -272,6 +274,10 @@ void handleTokens(ElideData edata,ElideRange range,Object resp,JSONObject err)
       ElideNode en = edata.addNode(soff,eoff);
       en.setSymbolType(st);  
       en.setNodeType(nt);
+      if (st.contains("DECL")) {
+         ElideNode par = en.getParent();
+         en.setSymbolName(par.getSymbolName());
+       }
     }
 }
 
@@ -508,6 +514,7 @@ private static class ElideNode implements Comparable<ElideNode> {
    private int end_offset;
    private double node_priority;
    private Set<ElideNode> child_nodes;
+   private ElideNode parent_node;
    private String node_type;
    private String symbol_type;
    private String symbol_name;
@@ -520,10 +527,13 @@ private static class ElideNode implements Comparable<ElideNode> {
       node_type = null;
       symbol_type = null;
       symbol_name = null;
+      parent_node = null;
     }
   
    int getStartOffset()                         { return start_offset; }
    int getEndOffset()                           { return end_offset; }
+   String getSymbolName()                       { return symbol_name; }
+   ElideNode getParent()                        { return parent_node; }
    
    void setNodeType(String nt)                  { node_type = nt; }
    void setSymbolType(String st)                { symbol_type = st; }
@@ -538,6 +548,7 @@ private static class ElideNode implements Comparable<ElideNode> {
    void addChild(ElideNode cn) {
       if (child_nodes == null) child_nodes = new TreeSet<>();
       child_nodes.add(cn);
+      cn.parent_node = this;
     }
    
    void addNode(ElideNode child,int start,int end) {
