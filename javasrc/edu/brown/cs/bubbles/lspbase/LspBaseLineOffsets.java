@@ -63,6 +63,7 @@ LspBaseLineOffsets(String newline,Reader input)
 
 
 
+   
 /********************************************************************************/
 /*										*/
 /*	Setup methods								*/
@@ -84,8 +85,7 @@ private void setupIde(Reader r,String nl)
 	  }
 	 else {
 	    if (ch == '\n') addIde(i+1);
-	    else if (lastcr)
-	       addIde(i);
+	    else if (lastcr) addIde(i);
 	    lastcr = (ch == '\r');
 	  }
        }

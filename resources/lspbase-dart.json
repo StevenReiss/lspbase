@@ -311,7 +311,8 @@
    },
   lspbaseConfiguration:
    {
-     "useParameters" : false
+     "useParameters" : false,
+     "fileModule" : true
    }
 }
 

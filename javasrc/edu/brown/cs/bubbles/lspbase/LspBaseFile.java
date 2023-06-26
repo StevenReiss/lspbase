@@ -46,6 +46,7 @@ import org.w3c.dom.Element;
 
 import edu.brown.cs.ivy.file.IvyFile;
 import edu.brown.cs.ivy.file.IvyFormat;
+import edu.brown.cs.ivy.xml.IvyXml;
 import edu.brown.cs.ivy.xml.IvyXmlWriter;
 
 class LspBaseFile implements LspBaseConstants
@@ -382,8 +383,9 @@ private synchronized void setupOffsets()
           }
        }
       else {
+         String cnts = getText(0,file_contents.length());
          line_offsets = new LspBaseLineOffsets(newline,
-               new StringReader(file_contents.toString()));
+               new StringReader(cnts));
        }
     }
 }
@@ -399,9 +401,19 @@ private synchronized void setupOffsets()
 JSONArray getSymbols()
 {
    if (file_symbols == null) {
-      for_project.getProtocol().sendWorkMessage("textDocument/documentSymbol",
+      LspBaseProtocol proto = for_project.getProtocol();
+      proto.sendWorkMessage("textDocument/documentSymbol",
             this::handleSymbols,
             "textDocument",getTextDocumentId());
+      if (for_project.getLanguageData().getCapabilityBool("fileModule")) {
+         String nm = for_file.getName();
+         int idx = nm.lastIndexOf(".");
+         if (idx > 0) nm = nm.substring(0,idx);
+         JSONObject rng = proto.createRange(this,0,getLength());
+         JSONObject obj = createJson("name","","kind",2,"range",rng,
+               "selectionRange",rng);
+         addSymbolForFile(obj,null);
+       }
     }
    return file_symbols;
 }
@@ -1272,6 +1284,7 @@ void getCodeActions(String bid,int offset,int length,List<Element> problems,
    
    JSONArray diags = new JSONArray();
    for (Element prob : problems) {
+      LspLog.logD("HANDLE PROBLEM " + IvyXml.convertXmlToString(prob));
       // convert prob to JSON object and add to diags
     }
    
@@ -1297,7 +1310,7 @@ private class CodeActions implements LspResponder {
     }
    
    @Override public void handleResponse(Object data,JSONObject err) {
-      
+      LspLog.logD("CODE ACTIONS " + data + " " + err);
     }
    
 }       // end of inner class CodeActions

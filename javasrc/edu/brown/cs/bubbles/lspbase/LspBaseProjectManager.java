@@ -32,6 +32,7 @@ import java.util.TreeMap;
 import java.util.function.Consumer;
 
 import org.json.JSONArray;
+import org.json.JSONObject;
 import org.w3c.dom.Element;
 
 import edu.brown.cs.ivy.xml.IvyXml;
@@ -709,8 +710,10 @@ private class NameThread extends Thread implements LspNamer {
    
       xml_writer.begin("FILE");
       xml_writer.textElement("PATH",file.getPath());
+      
       for (int i = 0; i < names.length(); ++i) {
-         LspBaseUtil.outputLspSymbol(project,file,names.getJSONObject(i),xml_writer);
+         JSONObject jobj = names.getJSONObject(i);
+         LspBaseUtil.outputLspSymbol(project,file,jobj,xml_writer);
        }
       xml_writer.end("FILE");
    

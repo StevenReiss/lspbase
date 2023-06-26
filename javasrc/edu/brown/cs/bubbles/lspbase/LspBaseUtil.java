@@ -78,7 +78,15 @@ private static void outputSymbol(LspBaseProject project,LspBaseFile file,JSONObj
    xw.begin("ITEM");
    xw.field("PROJECT",project.getName());
    xw.field("PATH",file.getPath());
+   String nm = sym.getString("name");
+   String params = null;
+   int idx = nm.indexOf("(");
+   if (idx > 0) {
+      params = nm.substring(idx);
+      nm = nm.substring(0,idx);
+    }
    xw.field("NAME",sym.getString("name"));
+   if (params != null) xw.field("PARAMETERS",params);
    xw.field("TYPE",SymbolKinds[sym.getInt("kind")]);
    JSONObject range = loc.getJSONObject("range");
    
@@ -111,6 +119,8 @@ private static void outputSymbol(LspBaseProject project,LspBaseFile file,JSONObj
 
 
 
+
+
 private static void outputRange(boolean extended,LspBaseFile file,JSONObject range,IvyXmlWriter xw)
 {
    JSONObject start = range.getJSONObject("start");
@@ -121,6 +131,7 @@ private static void outputRange(boolean extended,LspBaseFile file,JSONObject ran
    int ln1 = end.getInt("line") + 1;
    int ch1 = end.getInt("character") + 1;
    int pos1 = file.mapLineCharToOffset(ln1,ch1);
+
    if (!extended) {
       xw.field("LINE",ln0);
       xw.field("COL", ch0);
