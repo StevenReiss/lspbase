@@ -249,6 +249,7 @@ private String handleCommand(String cmd,String proj,Element xml) throws LspBaseE
       case "QUICKFIX" :
       case "FIXIMPORTS" :
       case "RENAME" :
+      case "FORMATCODE" :
          lsp_base.getProjectManager().handleEditCommand(cmd,proj,xml,xw);
          break;
       case "GETRUNCONFIG" :

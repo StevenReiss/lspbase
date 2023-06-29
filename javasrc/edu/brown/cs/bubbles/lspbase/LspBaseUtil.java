@@ -22,6 +22,8 @@
 
 package edu.brown.cs.bubbles.lspbase;
 
+import java.lang.reflect.Modifier;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -85,7 +87,7 @@ private static void outputSymbol(LspBaseProject project,LspBaseFile file,JSONObj
       params = nm.substring(idx);
       nm = nm.substring(0,idx);
     }
-   xw.field("NAME",sym.getString("name"));
+   xw.field("NAME",nm);
    if (params != null) xw.field("PARAMETERS",params);
    xw.field("TYPE",SymbolKinds[sym.getInt("kind")]);
    JSONObject range = loc.getJSONObject("range");
@@ -97,7 +99,7 @@ private static void outputSymbol(LspBaseProject project,LspBaseFile file,JSONObj
     }
    
    String filpfx = project.getRelativeFile(file);
-   String qnam = xpfx + sym.getString("name");
+   String qnam = xpfx + nm;
    String hdl = project.getName() + ":" + filpfx + "#" + qnam;
    String det = sym.optString("detail",null);
    if (det != null) {
@@ -110,9 +112,19 @@ private static void outputSymbol(LspBaseProject project,LspBaseFile file,JSONObj
        }
       hdl += det;
     }
+   
    xw.field("PREFIX",filpfx);
    xw.field("QNAME",qnam);
    xw.field("HANDLE",hdl);
+   
+   int fgs = 0;
+   LspBaseLanguageData ld = file.getLanguageData();
+   String ppfx = ld.getCapabilityString("privatePrefix");
+   if (ppfx != null && nm.startsWith(ppfx)) {
+      xw.field("FLAGS",Modifier.PRIVATE);
+    }
+   if (fgs != 0) xw.field("FLAGS",fgs);
+   
    xw.end("ITEM");
 }
 
@@ -235,6 +247,72 @@ static void outputFindResult(FindResult fr,IvyXmlWriter xw)
    xw.end("MATCH");
 }
    
+
+/********************************************************************************/
+/*                                                                              */
+/*      Output text edits                                                       */
+/*                                                                              */
+/********************************************************************************/
+
+private static int edit_counter = 1;
+
+
+static void outputTextEdit(LspBaseFile file,JSONArray editl,IvyXmlWriter xw)
+{
+   if (editl.length() > 1) {
+      int minoff = -1;
+      int maxoff = -1;
+      for (int i = 0; i < editl.length(); ++i) {
+         JSONObject ted = editl.getJSONObject(i);
+         JSONObject rng = ted.getJSONObject("range");
+         int soff = file.mapRangeToStartOffset(rng);
+         int eoff = file.mapRangeToEndOffset(rng);
+         if (minoff < 0 || soff < minoff) minoff = soff;
+         if (maxoff < 0 || eoff > maxoff) maxoff = eoff;
+       }
+      xw.begin("EDIT");
+      xw.field("OFFSET",minoff);
+      xw.field("LENGTH",maxoff-minoff);
+      xw.field("ID",editl.hashCode());
+      xw.field("COUNTER",++edit_counter);
+      for (int i = 0; i < editl.length(); ++i) {
+         JSONObject ted = editl.getJSONObject(i);
+         outputSingleEdit(file,ted,xw);
+       }
+    }
+   else {
+      JSONObject ted = editl.getJSONObject(0);
+      outputSingleEdit(file,ted,xw);
+    }
+}
+
+
+private static void outputSingleEdit(LspBaseFile file,JSONObject ted,IvyXmlWriter xw)
+{
+   JSONObject rng = ted.getJSONObject("range");
+   String ntxt = ted.getString("newText");
+   int soff = file.mapRangeToStartOffset(rng);
+   int eoff = file.mapRangeToEndOffset(rng);
+   if (ntxt != null && ntxt.length() == 0) ntxt = null;
+   xw.begin("EDIT");
+   xw.field("OFFSET",soff);
+   xw.field("LENGTH",eoff-soff);
+   xw.field("ID",ted.hashCode());
+   xw.field("COUNTER",++edit_counter);
+   if (ntxt == null) {
+      xw.field("TYPE","DELETE");
+    }
+   else if (eoff == soff) {
+      xw.field("TYPE","INSERT");
+      xw.cdataElement("TEXT",ntxt);
+    }
+   else {
+      xw.field("TYPE","REPLACE");
+      xw.cdataElement("TEXT",ntxt);
+    }
+   xw.end("EDIT");
+}
+
    
 }
 

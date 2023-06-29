@@ -6,7 +6,7 @@
 	  "workspaceEdit" : {
 	     "documentChanges" : true,
 	     "resourceOperations" : [ "create", "rename", "delete" ],
-	     "failureHandling" : "undo",
+	     "failureHandling" : "abort",
 	     "normalizesLineEndings" : true,
 	     "changeAnnotationSupport" : {
 		 "groupsOnLabel" : false
@@ -312,7 +312,18 @@
   lspbaseConfiguration:
    {
      "useParameters" : false,
-     "fileModule" : true
+     "fileModule" : true,
+     "splitIndent" : false,
+     "privatePrefix" : "_",
+     "elision" : {
+	"scanBraces" : true,
+	"scanCalls" : true,
+	"slashslashComments" : true,
+	"slashstarComments" : true,
+	"poundComments" : false,
+	"textBlocks" : true,
+	"backquoteBlocks" : false
+      }
    }
 }
 

@@ -40,7 +40,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.Stack;
 import java.util.TreeSet;
+
+import javax.swing.text.Segment;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -57,11 +60,21 @@ class LspBaseElider implements LspBaseConstants
 /*                                                                              */
 /********************************************************************************/
 
+enum CommentType { NONE, EOL, STARSLASH };
+
 private Set<ElideRegion> elide_rdata;
 private LspBaseFile for_file;
 
 private String [] token_types;
 private String [] token_modifiers;
+private boolean scan_braces;
+private boolean scan_calls;
+private boolean slashslash_comments;
+private boolean slashstar_comments;
+private boolean pound_comments;
+private boolean text_blocks;            // using triple quotes
+private boolean backquote_blocks;
+
 
 
 private static double DOWN_PRIORITY = 0.90;
@@ -75,6 +88,8 @@ private String [] ElideDeclTypes = {
       null, null, "ENUMC", "CLASS", null,
       null, null
 };
+
+
 
 
 /********************************************************************************/
@@ -100,6 +115,15 @@ LspBaseElider(LspBaseFile file)
    for (int i = 0; i < jarr.length(); ++i) {
       token_modifiers[i] = jarr.getString(i);
     }
+   
+   LspBaseLanguageData lld = file.getLanguageData();
+   scan_braces = lld.getCapabilityBool("elision.scanBraces");
+   scan_calls = lld.getCapabilityBool("elision.scanCalls");
+   slashslash_comments = lld.getCapabilityBool("elision.slashslashComments");
+   slashstar_comments = lld.getCapabilityBool("elision.slashstarComments");
+   pound_comments = lld.getCapabilityBool("elision.poundComments");
+   text_blocks = lld.getCapabilityBool("elision.textBlocks");
+   backquote_blocks = lld.getCapabilityBool("elision.backquoteBlocks");
 }
 
 
@@ -146,8 +170,8 @@ boolean computeElision(IvyXmlWriter xw)
    
    LspBaseProject lbp = for_file.getProject();
    LspBaseProtocol proto = lbp.getProtocol();
-   proto.sendWorkMessage("textDocument/foldingRange",
-         (Object resp,JSONObject err) -> handleFolds(data,resp,err),
+   FoldResponder fr = new FoldResponder(data);
+   proto.sendWorkMessage("textDocument/foldingRange",fr,
          "textDocument",for_file.getTextDocumentId());
    
    handleDecls(data,for_file.getSymbols(),null);
@@ -156,33 +180,84 @@ boolean computeElision(IvyXmlWriter xw)
 //       "textDocument",for_file.getTextDocumentId());
    
    List<ElideRange> ranges = data.getRanges();
+   Segment textdata = null;
    for (ElideRange range : ranges) {
-      proto.sendWorkMessage("textDocument/semanticTokens/range",
-            (Object resp,JSONObject err) -> handleTokens(data,range,resp,err),
+      if (scan_calls || scan_braces) {
+         textdata = for_file.getSegment(range.getStartOffset(),
+               range.getEndOffset()-range.getStartOffset());
+       }
+      TokenResponder tr = new TokenResponder(data,range,textdata);
+      proto.sendWorkMessage("textDocument/semanticTokens/range",tr,
             "textDocument",for_file.getTextDocumentId(),
             "range",proto.createRange(for_file,range.getStartOffset(),
                   range.getEndOffset()));
+      
+      if (scan_braces) scanBraces(data,range.getStartOffset(),range.getEndOffset(),textdata);
     }
    
-   // might want to get hint data
-   // might want to check relevance of elision after each query to cut work
-  
    data.outputElision(xw);
    
    return true;
 }
 
 
+private class FoldResponder implements LspResponder {
+  
+   private ElideData elide_data;
+   
+   FoldResponder(ElideData ed) {
+      elide_data = ed;
+    }   
+   
+   @Override public void handleResponse(Object resp,JSONObject err) {
+      if (resp instanceof JSONArray) {
+         JSONArray folds = (JSONArray) resp;
+         handleFolds(elide_data,folds);
+       }
+    }
+
+}       // end of inner class FoldResponder
 
 
-void handleFolds(ElideData data,Object resp,JSONObject err)
+
+private class TokenResponder implements LspResponder {
+
+   private ElideData elide_data;
+   private ElideRange elide_range;
+   private Segment text_data;
+   
+   TokenResponder(ElideData ed,ElideRange er,Segment td) {
+      elide_data = ed;
+      elide_range = er;
+      text_data = td;
+    }
+   
+   @Override public void handleResponse(Object resp,JSONObject err) {
+      if (resp instanceof JSONObject) {
+         JSONObject robj = (JSONObject) resp;
+         JSONArray data = robj.getJSONArray("data");
+         handleTokens(elide_data,elide_range,text_data,data);
+       }
+    }
+   
+}       // end of inner class TokenResponder
+
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Handle top-level folds from lspbase                                     */
+/*                                                                              */
+/********************************************************************************/
+
+void handleFolds(ElideData data,JSONArray folds)
 { 
-   JSONArray folds = (JSONArray) resp;
    for (int i = 0; i < folds.length(); ++i) {
       JSONObject fold = folds.getJSONObject(i);
       int soff = for_file.mapLspLineToOffset(fold.getInt("startLine"));
       int eoff = for_file.mapLspLineCharToOffset(fold.getInt("endLine"),
-            fold.getInt("endCharacter"));
+            fold.getInt("endCharacter")) + 1;
       if (!data.isRelevant(soff,eoff)) continue;
       String kind = fold.optString("kind","region");
       String typ = null;
@@ -201,6 +276,13 @@ void handleFolds(ElideData data,Object resp,JSONObject err)
     }
 }
 
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Handle declarations for this file                                       */
+/*                                                                              */
+/********************************************************************************/
 
 void handleDecls(ElideData data,Object resp,JSONObject err)
 {
@@ -237,10 +319,14 @@ private void handleDecl(ElideData data,JSONObject decl)
 
 
 
-void handleTokens(ElideData edata,ElideRange range,Object resp,JSONObject err)
+/********************************************************************************/
+/*                                                                              */
+/*      Handle token information                                                */
+/*                                                                              */
+/********************************************************************************/
+
+void handleTokens(ElideData edata,ElideRange range,Segment textdata,JSONArray arr)
 {   
-   JSONObject data = (JSONObject) resp;
-   JSONArray arr = data.getJSONArray("data");
    int line = 0;
    int col = 0;
    for (int i = 0; i < arr.length(); i += 5) {
@@ -270,10 +356,14 @@ void handleTokens(ElideData edata,ElideRange range,Object resp,JSONObject err)
       if (!edata.isRelevant(soff,eoff)) continue;
       String st = getSymbolType(typ,modset);
       if (st == null) continue;
-      String nt = getNodeType(typ,modset);
+      if (typ.equals("function") || typ.equals("method")) {
+         if (!modset.contains("declaration")) {
+            scanCallBlock(edata,soff,eoff,textdata,range.getStartOffset());
+          }
+       }
+         
       ElideNode en = edata.addNode(soff,eoff);
       en.setSymbolType(st);  
-      en.setNodeType(nt);
       if (st.contains("DECL")) {
          ElideNode par = en.getParent();
          en.setSymbolName(par.getSymbolName());
@@ -281,6 +371,183 @@ void handleTokens(ElideData edata,ElideRange range,Object resp,JSONObject err)
     }
 }
 
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Handle scanning for braces                                              */
+/*                                                                              */
+/********************************************************************************/
+
+private void scanBraces(ElideData edata,int soff,int eoff,Segment text)
+{
+   int textln = text.length();
+ 
+   Stack<Integer> starts = new Stack<>();
+   
+   for (int i = 0; i < textln; ++i) {
+      char c = text.charAt(i);
+      switch (c) {
+         case '#' :
+         case '/' :
+            int j0 = skipComment(i,c,text);
+            if (j0 > 0) {
+               i = j0;
+             }
+            break;
+         case '"' :
+         case '`' :
+         case '\'' :
+            int j1 = skipString(i,c,text);
+            if (j1 > 0) {
+               i = j1;
+             }
+            break;
+         case '{' :
+            starts.push(i);
+            break;
+         case '}' :
+            if (!starts.isEmpty()) {
+               int s0 = starts.pop();
+               addScanBlock(edata,s0+soff,i+1+soff,"BLOCK");
+             }
+            break;
+       }     
+    }
+}
+
+
+
+private ElideNode scanCallBlock(ElideData edata,int soff,int eoff,Segment text,int segstart)
+{
+   LspLog.logD("SCAN CALL " + soff + " " + eoff + " " + segstart);
+   int seglen = text.length();
+   int lpr = 0;
+   for (int i = eoff-segstart; i < seglen; ++i) {
+      char c = text.charAt(i);
+      if (c == '(') {
+         lpr = i;
+         break;
+       }
+      else if (Character.isWhitespace(c)) continue;
+      else return null;
+    }
+   LspLog.logD("CALL LPR " + lpr + " " + (lpr+segstart));
+   
+   int lvl = 0;
+   for (int j = lpr; j < seglen; ++j) {
+      char c = text.charAt(j);
+      switch (c) {
+         case '#' :
+         case '/' :
+            int j0 = skipComment(j,c,text);
+            if (j0 > 0) {
+               j = j0;
+             }
+            break;
+         case '"' :
+         case '`' :
+         case '\'' :
+            int j1 = skipString(j,c,text);
+            if (j1 > 0) {
+               j = j1;
+             }
+            break; 
+         case '(' :
+            ++lvl;
+            break;
+         case ')' :
+            --lvl;
+            if (lvl == 0) {
+               LspLog.logD("CALL NODE " + soff + " " + (j+1+segstart));
+               ElideNode en = addScanBlock(edata,soff,j+1+segstart,"CALL");
+               en.setHintLocation(lpr+segstart);
+               return en;
+             }
+            break;
+       }
+    }
+   
+   return null;
+}
+
+
+
+private int skipComment(int idx,char c,Segment text)
+{
+   if (idx+1 >= text.length()) return -1;
+   char c1 = text.charAt(idx+1);
+   // handle one line commemts
+   if ((slashslash_comments && c == '/' && c1 == '/') ||
+         (pound_comments && c == '#')) {
+       while (idx < text.length()) {
+          c = text.charAt(idx);
+          ++idx;
+          if (c == '\n') break;
+        }
+       return idx;
+    }
+   else if (slashstar_comments && c == '/' && c1 == '*' && idx+3 < text.length()){
+      c1 = text.charAt(idx+2);
+      for (idx = idx+2; idx+2 < text.length(); ++idx) {
+         c = c1;
+         c1 = text.charAt(idx+1);
+         if (c == '*' && c1 == '/') {
+            idx += 2;
+            break;
+          }
+       }
+      return idx;
+    }
+   
+   return -1;
+}
+
+
+
+private int skipString(int idx,char c0,Segment text)
+{
+   boolean endateol = true;
+   int endcount = 1;
+   if (c0 == '`') {
+      if (!backquote_blocks) return -1;
+      else endateol = false;
+    }
+   else if (idx+3 < text.length() && text_blocks && 
+         text.charAt(idx+1) == c0 && text.charAt(idx+2) == c0) {
+      idx +=2;
+      endateol = false;
+      endcount = 3;
+    }
+    
+   int fnd = 0;
+   for (idx = idx+1; idx+1 < text.length(); ++idx) {
+      char c = text.charAt(idx);
+      if (c == '\\') {
+         ++idx;
+         fnd = 0;
+       }
+      else if (c == '\n' && endateol) break;
+      else if (c == c0) {
+         ++fnd;
+         if (endcount == fnd) break;
+       }
+      else fnd = 0;
+    }
+   
+   return idx;
+}
+
+
+
+private ElideNode addScanBlock(ElideData edata,int soff,int eoff,String nodetype)
+{
+   ElideNode en = edata.addNode(soff,eoff);
+   if (en == null) return null;
+   en.setNodeType(nodetype);
+   
+   return en;
+}
 
 
 /********************************************************************************/
@@ -368,26 +635,6 @@ String getSymbolType(String typ,Set<String> mods)
       case "operator" :
       case "namespace" :
       case "boolean" :
-         break;
-    }
-   
-   return t;
-}
-
-
-private String getNodeType(String typ,Set<String> mods)
-{
-   String t = null;
-   
-   switch (typ) {
-      case "function" :
-      case "method" :
-         if (!mods.contains("declaration")) {
-            t = "CALL";
-            if (mods.contains("deprecated")) t += "D";
-            if (mods.contains("abstract")) t += "A";
-            else if (mods.contains("static")) t += "S";
-          }
          break;
     }
    
@@ -508,7 +755,7 @@ private static class ElideRange {
 /*                                                                              */
 /********************************************************************************/
 
-private static class ElideNode implements Comparable<ElideNode> {
+private class ElideNode implements Comparable<ElideNode>, LspResponder {
    
    private int start_offset;
    private int end_offset;
@@ -518,6 +765,8 @@ private static class ElideNode implements Comparable<ElideNode> {
    private String node_type;
    private String symbol_type;
    private String symbol_name;
+   private JSONObject signature_data;
+   private int hint_location;
    
    ElideNode(int start,int end) {
       start_offset = start;
@@ -528,6 +777,7 @@ private static class ElideNode implements Comparable<ElideNode> {
       symbol_type = null;
       symbol_name = null;
       parent_node = null;
+      hint_location = -1;
     }
   
    int getStartOffset()                         { return start_offset; }
@@ -538,36 +788,50 @@ private static class ElideNode implements Comparable<ElideNode> {
    void setNodeType(String nt)                  { node_type = nt; }
    void setSymbolType(String st)                { symbol_type = st; }
    void setSymbolName(String nm)                { symbol_name = nm; }
+   void setHintLocation(int loc)                { hint_location = loc; }
    
    boolean contains(ElideNode node) {
       return (start_offset <= node.start_offset && end_offset >= node.end_offset);
     }
    
-   
-   
-   void addChild(ElideNode cn) {
-      if (child_nodes == null) child_nodes = new TreeSet<>();
-      child_nodes.add(cn);
-      cn.parent_node = this;
+   boolean overlaps(ElideNode node) {
+      if (start_offset >= node.getEndOffset()) return false;
+      if (end_offset <= node.getStartOffset()) return false;
+      return true;
     }
    
-   void addNode(ElideNode child,int start,int end) {
+   ElideNode addNode(ElideNode child,int start,int end) {
       if (child_nodes != null) {
          for (Iterator<ElideNode> it = child_nodes.iterator(); it.hasNext(); ) {
             ElideNode cn = it.next();
             if (cn.getEndOffset() < start) continue;
             if (cn.getStartOffset() > end) break;
             if (cn.contains(child)) {
-               cn.addNode(child,start,end);
-               return;
+               return cn.addNode(child,start,end);
              }
             else if (child.contains(cn)) {
                it.remove();
                child.addChild(cn);
              }
+            else if (cn.overlaps(child)) {
+               LspLog.logE("Overlapping node add " + start + " " + end + " " +
+                     cn.start_offset + " " + cn.end_offset);
+               // overlap -- ignore; first restore any removed children
+               for (ElideNode en1 : cn.child_nodes) {
+                  addChild(en1);
+                }
+               return null;
+             }
           }
        }
       addChild(child);
+      return child;
+    }
+   
+   private void addChild(ElideNode cn) {
+      if (child_nodes == null) child_nodes = new TreeSet<>();
+      child_nodes.add(cn);
+      cn.parent_node = this;
     }
    
    @Override public int compareTo(ElideNode node) {
@@ -597,13 +861,63 @@ private static class ElideNode implements Comparable<ElideNode> {
       if (symbol_name != null) xw.field("FULLNAME",symbol_name);
       if (symbol_type != null) xw.field("TYPE",symbol_type);
       if (node_type != null) xw.field("NODE",node_type);
-      // handle hint data
+      if (hint_location >= 0) outputHintData(xw);
       if (child_nodes != null) {
          for (ElideNode cn : child_nodes) {
             cn.outputXml(xw);
           }
        }
       xw.end("ELIDE");
+    }
+   
+   private void outputHintData(IvyXmlWriter xw) {
+      if ("CALL".equals(node_type)) {
+         LspBaseProject lbp = for_file.getProject();
+         LspBaseProtocol proto = lbp.getProtocol();
+         JSONObject ctx = createJson("triggerKind",1,"isRetrigger",false);
+         signature_data = null;
+         proto.sendMessage("textDocument/signatureHelp",this,
+               "textDocument",for_file.getTextDocumentId(),
+               "position",proto.createPosition(for_file,hint_location+1),
+               "context",ctx);
+         if (signature_data != null) {
+            JSONArray params = signature_data.optJSONArray("parameters");
+            if (params != null) {
+               xw.begin("HINT");
+               xw.field("KIND","METHOD");
+               // xw.field("RETURNS",<<return type>>);
+               // xw.field("CONSTUCTOR",true);
+               xw.field("NUMPARAM",params.length());
+               for (int i = 0; i < params.length(); ++i) {
+                  JSONObject param = params.getJSONObject(i);
+                  String label = param.getString("label");
+                  xw.begin("PARAMETER");
+                  int idx = label.lastIndexOf(" ");
+                  if (idx > 0) {
+                     xw.field("NAME",label.substring(idx+1));
+                     xw.field("TYPE",label.substring(0,idx));
+                   }
+                  else {
+                     xw.field("NAME",label);
+                   }
+                  xw.end("PARAMETER");
+                }
+               xw.end("HINT");
+             }
+          }
+       }
+    }
+   
+   @Override public void handleResponse(Object data,JSONObject err) {
+      if (data != null && data instanceof JSONObject) {
+         JSONObject help = (JSONObject) data;
+         if (help.isNull("signatures")) return;
+         JSONArray sigs = help.getJSONArray("signatures");
+         if (sigs.length() == 0) return;
+         int idx = help.optInt("activeSignature",0);
+         if (idx < 0 || idx >= sigs.length()) idx = 0;
+         signature_data = sigs.getJSONObject(idx);
+       }
     }
    
 }       // end of inner class ElideNode

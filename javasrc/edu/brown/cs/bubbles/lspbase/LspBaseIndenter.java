@@ -135,7 +135,8 @@ private int computeActualIndent()
    getLine();
    int x = 0;
    
-   // get initial indent
+   // get initial indent 
+   // TODO -- handle tabs
    for ( ; getChar(x) == ' '; ++x);
    char c = getChar(x);
    if (x < line_length) init_indent = x;
@@ -331,7 +332,6 @@ String getLine()
       else if (lno == split_pos.getLine()) {
          eoffset = start_offset;
        }
-   
     }
    
    String txt = for_file.getText(soffset,eoffset-soffset);

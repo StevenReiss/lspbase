@@ -119,6 +119,22 @@ Object getCapability(String key)
 }
 
 
+JSONObject getCapabilityJson(String key)
+{
+   Object cap = getCapability(key);
+   if (cap == null || !(cap instanceof JSONObject)) return null;
+   return (JSONObject) cap;
+}
+
+
+String getCapabilityString(String key)
+{
+   Object o = getCapability(key);
+   if (o == null) return null;
+   return o.toString();
+}
+
+
 boolean getCapabilityBool(String key)
 {
    return getCapabilityBool(key,false);

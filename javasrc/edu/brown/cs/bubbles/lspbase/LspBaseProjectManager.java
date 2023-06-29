@@ -381,8 +381,10 @@ void handleEditCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
       case "RENAME" :
          handleRename(proj,IvyXml.getAttrString(xml,"BID","*"),
                IvyXml.getAttrString(xml,"FILE"),
-               IvyXml.getAttrInt(xml,"START"),IvyXml.getAttrInt(xml,"END"),
-               IvyXml.getAttrString(xml,"NAME"),IvyXml.getAttrString(xml,"HANDLE"),
+               IvyXml.getAttrInt(xml,"START"),
+               IvyXml.getAttrInt(xml,"END"),
+               IvyXml.getAttrString(xml,"NAME"),
+               IvyXml.getAttrString(xml,"HANDLE"),
                IvyXml.getAttrString(xml,"NEWNAME"),
                IvyXml.getAttrBool(xml,"KEEPORIGINAL",false),
                IvyXml.getAttrBool(xml,"RENAMEGETTERS",false),
@@ -395,12 +397,15 @@ void handleEditCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
                IvyXml.getAttrBool(xml,"DOEDIT",false),
                IvyXml.getAttrString(xml,"FILES"),xw);
          break;
+      case "FORMATCODE" :
+         handleFormatCode(proj,IvyXml.getAttrString(xml,"BID","*"),
+	       IvyXml.getAttrString(xml,"FILE"),
+	       IvyXml.getAttrInt(xml,"START"),
+	       IvyXml.getAttrInt(xml,"END"),xw);
+	 break;
          
     }
 }
-
-
-
 
 
 
@@ -574,6 +579,39 @@ void handleGetCompletions(String proj,String bid,String file,int offset,IvyXmlWr
 }
 
 
+void applyWorkspaceEdit(JSONObject wsedit)
+{
+   JSONArray chngs = wsedit.getJSONArray("documentChanges");
+   for (int i = 0; i < chngs.length(); ++i) {
+      JSONObject chng = chngs.getJSONObject(i);
+      String kind = chng.optString("kind","edit");
+      switch (kind) {
+         case "create" :
+            // TODO: handle create a file
+            break;
+         case "rename" :
+            // TODO: handle rename a file
+            break;
+         case "delete" :
+            // TODO: handle delete a file
+            break;
+         case "edit" :
+            applyTextDocumentEdit(chng);
+            break;
+       }
+    }
+}
+
+
+void applyTextDocumentEdit(JSONObject tdedit) 
+{
+   JSONObject tdoc = tdedit.getJSONObject("textDocument");
+   LspBaseFile lbf = findFile(null,tdoc.getString("uri"));
+   int tid = tdoc.optInt("version",0);
+   JSONArray jedits = tdedit.getJSONArray("edits");
+   lbf.edit("*APPLY*",tid,jedits);
+}
+
 
 /********************************************************************************/
 /*                                                                              */
@@ -590,6 +628,7 @@ void handleFixImports(String proj,String bid,String file,
    if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
    lbf.fixImports(bid,demand,staticdemand,order,add,xw);
 }
+
 
 
 /********************************************************************************/
@@ -627,6 +666,23 @@ void handleRename(String proj,String bid,String file,
    if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
    lbf.rename(soffset,eoffset,name,handle,newname,keeporig,getters,setters,
          hier,qualified,refs,similar,text,doedit,files,xw);
+}
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Handle FORMATCODE                                                       */
+/*                                                                              */
+/********************************************************************************/
+
+void handleFormatCode(String proj,String bid,String file,
+      int start,int end,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseFile lbf = findFile(proj,file);
+   if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
+   lbf.formatCode(bid,start,end,xw);
 }
 
 
@@ -906,6 +962,7 @@ private boolean setProjectPreferences(LspBaseProject proj,Element xml)
 
    return true;
 }
+
 
 
 
