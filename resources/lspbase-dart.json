@@ -309,8 +309,25 @@
       "includeDependenciesInWorkspaceSymbols" : true
      }
    },
-  lspbaseConfiguration:
-   {
+  debugConfiguration: {
+     initialize: {
+	"clientName" : "Code Bubbles LSP Interface",
+	"adapterID" : "LSPBASE",
+	"linesStartAt1" : true,
+	"columnsStartAt1" : true,
+	"pathFormat" : "path",
+	"supportsVariableType" : true,
+	"supportsVariablePaging" : false,
+	"supportsRunInTerminalRequest" : false,
+	"supportsMemoryReferences" : false,
+	"supportsProgressReporting" : true,
+	"supportsInvalidatedEvent" : true,
+	"supportsMemoryEvent" : true,
+	"supportsArgsCanBeInterpretedByShell" : false,
+	"supportsStartDebuggingRequest" : true
+      }
+    },
+  lspbaseConfiguration: {
      "useParameters" : false,
      "fileModule" : true,
      "splitIndent" : false,

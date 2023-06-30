@@ -73,26 +73,6 @@ private static AtomicInteger id_counter = new AtomicInteger(10000);
 private static AtomicLong progress_counter = new AtomicLong(1);
 
 
-static final int ParseError = -32700;
-static final int InvalidRequest = -32600;
-static final int MethodNotFound = -32601;
-static final int InvalidParams = -32602;
-static final int internalError = -32603;
-static final int jsonrpcReservedErrorRangeStart = -32099;
-static final int serverErrorStart= jsonrpcReservedErrorRangeStart;
-static final int ServerNotInitialized = -32002;
-static final int UnknownErrorCode = -32001;
-static final int jsonrpcReservedErrorRangeEnd = -32000;
-static final int serverErrorEnd = jsonrpcReservedErrorRangeEnd;
-static final int lspReservedErrorRangeStart = -32899;
-static final int RequestFailed = -32803;
-static final int ServerCancelled = -32802;
-static final int ContentModified = -32801;
-static final int RequestCancelled = -32800;
-static final int lspReservedErrorRangeEnd = -32800;
-
-
-
 /********************************************************************************/
 /*										*/
 /*	Constructors								*/
@@ -118,13 +98,14 @@ LspBaseProtocol(File workspace,List<LspBasePathSpec> paths,LspBaseLanguageData l
    try {
       config_data = new JSONObject(json);
       for_language.setCapabilities(config_data.getJSONObject("lspbaseConfiguration"));
+      for_language.setDebugConfiguration(config_data.getJSONObject("debugConfiguration"));
     }
    catch (Throwable e) {
       LspLog.logE("Problem with capability json: ",e);
       System.exit(1);
     }
 
-   String command = ld.getExecString();
+   String command = ld.getLspExecString();
    Map<String,String> keys = new HashMap<>();
    keys.put("ID","LspBase_" + ld.getName() + "_" + workspace.getName());
 
@@ -189,6 +170,13 @@ void addWorkspace(File ws,List<LspBasePathSpec> paths) {
 }
 
 
+
+/********************************************************************************/
+/*                                                                              */
+/*      Initialization and shut down                                            */
+/*                                                                              */
+/********************************************************************************/
+
 void shutDown()
 {
    if (!is_initialized) return;
@@ -242,7 +230,7 @@ void initialize()
       notifyAll();
     }
 
-   System.err.println("finished initialization");
+   LspLog.logD("Finished initialization");
 }
 
 
@@ -402,15 +390,6 @@ private void dummyHandler(Object resp,JSONObject err)
 
 
 
-
-
-
-
-
-
-
-
-
 void processReply(int id,Object cnts)
 {
    LspResponder lsp = pending_map.get(id);
@@ -448,7 +427,18 @@ void processError(int id,JSONObject err)
    LspLog.logE("Process Error " + err.toString(2));
 
    LspResponder lsp = pending_map.remove(id);
-   if (lsp != null) lsp.handleResponse(null,err);
+   try {
+      if (lsp != null) lsp.handleResponse(null,err);
+    }
+   catch (Throwable t) {
+      LspLog.logE("Problem processing error response",t);
+    }
+   finally {
+      synchronized (this) {
+         pending_map.remove(id);
+         notifyAll();
+       }
+    }
 }
 
 

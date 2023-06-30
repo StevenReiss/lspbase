@@ -70,8 +70,6 @@ String getId()                                  { return null; }
 void evaluateExpression(String bid,String eid,String expr,int frame,boolean stop)
 { }
 
-void addBreakpointInRuntime(LspBaseBreakpoint bpt)      { }
-void breakpointRemoved(LspBaseBreakpoint bpt)           { }
 void startDebug()                                       { }
 
 boolean debugAction(LspBaseDebugAction action)          { return false; }

@@ -97,7 +97,10 @@ static {
    dartcmd += " --client-id=$(ID)";
    dartcmd += " --client-version=1.2";
    dartcmd += " --protocol=lsp";
-   exec_map.put("dart",new LspBaseLanguageData("dart",dartcmd,".dart",false));
+   String dapcmd = "dart debug_adapter";
+   dapcmd += " --test";
+   exec_map.put("dart",new LspBaseLanguageData("dart",dartcmd,
+         dapcmd,".dart",false));
 }
 
 

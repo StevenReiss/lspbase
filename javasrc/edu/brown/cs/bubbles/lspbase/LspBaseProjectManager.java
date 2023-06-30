@@ -51,6 +51,7 @@ class LspBaseProjectManager implements LspBaseConstants
 private LspBaseMain	lsp_main;
 private File		work_space;
 private Map<String,LspBaseProject> all_projects;
+private LspBaseProject  main_project;
 private LspBasePreferences system_preferences;
 
 private static final String PROJECTS_FILE = ".projects";
@@ -75,7 +76,8 @@ LspBaseProjectManager(LspBaseMain nm) throws LspBaseException
       throw new LspBaseException("Illegal work space specified: " + ws);
 
    work_space = ws;
-   all_projects = new TreeMap<String,LspBaseProject>();
+   all_projects = new TreeMap<>();
+   main_project = null;
 
    File pf1 = new File(ws,".preferences");
    system_preferences = new LspBasePreferences(pf1);
@@ -114,6 +116,11 @@ LspBaseProject findProject(String proj) throws LspBaseException
    if (pp == null) throw new LspBaseException("Unknown project " + proj);
 
    return pp;
+}
+
+LspBaseProject getMainProject() 
+{
+   return main_project; 
 }
 
 
@@ -974,6 +981,8 @@ private boolean setProjectPreferences(LspBaseProject proj,Element xml)
 
 void loadProjects()
 {
+   LspBaseProject first = null;
+   
    File f = new File(work_space,PROJECTS_FILE);
    if (f.exists()) {
       Element xml = IvyXml.loadXmlFromFile(f);
@@ -982,9 +991,16 @@ void loadProjects()
 	    String nm = IvyXml.getAttrString(pelt,"NAME");
 	    String pnm = IvyXml.getAttrString(pelt,"PATH");
 	    File pf = new File(pnm);
-	    if (pf.exists()) loadProject(nm,pf);
+	    if (pf.exists()) {
+               LspBaseProject bp = loadProject(nm,pf);
+               if (first == null) first = bp;
+             }
 	  }
-	 return;
+         if (main_project == null && first != null) {
+            first.setMainProject();
+            main_project = first;
+          }
+         return;
        }
     }
 
@@ -1013,11 +1029,14 @@ void saveProjects()
 }
 
 
-private void loadProject(String nm,File pf)
+private LspBaseProject loadProject(String nm,File pf)
 {
    LspBaseProject p = new LspBaseProject(lsp_main,this,nm,pf);
 
    all_projects.put(p.getName(),p);
+   if (p.isMainProject()) main_project = p;
+   
+   return p;
 }
 
 

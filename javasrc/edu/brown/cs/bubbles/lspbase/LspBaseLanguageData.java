@@ -44,8 +44,10 @@ class LspBaseLanguageData implements LspBaseConstants
 /********************************************************************************/
 
 private String language_name;
-private String exec_string;
+private String lspexec_string;
+private String dapexec_string; 
 private Map<String,Object> server_capabilities;
+private JSONObject dap_configuration;
 private boolean single_workspace;
 private Set<String> file_extensions;
 
@@ -57,9 +59,10 @@ private Set<String> file_extensions;
 /*                                                                              */
 /********************************************************************************/
 
-LspBaseLanguageData(String name,String exec,String ext,boolean single) {
+LspBaseLanguageData(String name,String exec,String dap,String ext,boolean single) {
    language_name = name;
-   exec_string = exec;
+   lspexec_string = exec;
+   dapexec_string = dap;
    single_workspace = single;
    server_capabilities = new HashMap<>();
    file_extensions = new HashSet<>();
@@ -68,6 +71,7 @@ LspBaseLanguageData(String name,String exec,String ext,boolean single) {
       String extd = tok.nextToken();
       file_extensions.add(extd.toLowerCase());
     }
+   dap_configuration = null;
 }
 
 
@@ -77,9 +81,13 @@ LspBaseLanguageData(String name,String exec,String ext,boolean single) {
 /*                                                                              */
 /********************************************************************************/
 
-String getName()                             { return language_name; }
-String getExecString()                       { return exec_string; }
-boolean isSingleWorkspace()                  { return single_workspace; }
+String getName()                                { return language_name; }
+String getLspExecString()                       { return lspexec_string; }
+String getDapExecString()                       { return dapexec_string; }
+boolean isSingleWorkspace()                     { return single_workspace; }
+
+JSONObject getDebugConfiguration()              { return dap_configuration; }
+void setDebugConfiguration(JSONObject cfg)      { dap_configuration = cfg; }
 
 
 
@@ -91,8 +99,14 @@ boolean isSingleWorkspace()                  { return single_workspace; }
 
 void setCapabilities(JSONObject caps) 
 {
-   addJsonCapabilities(null,caps);
+   setCapabilities(null,caps);
 }
+
+void setCapabilities(String pfx,JSONObject caps)
+{
+   addJsonCapabilities(pfx,caps);
+}
+
 
 
 private void addJsonCapabilities(String pfx,JSONObject caps)
