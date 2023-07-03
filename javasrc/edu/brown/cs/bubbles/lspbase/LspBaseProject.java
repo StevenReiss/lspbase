@@ -62,7 +62,6 @@ private boolean 	is_open;
 private LspBaseProtocol use_protocol;
 private LspBasePreferences project_preferences;
 private Map<String,EditParameters> edit_parameters;
-private boolean         is_main;
 
 
 
@@ -85,7 +84,6 @@ LspBaseProject(LspBaseMain lm,LspBaseProjectManager pm,String name,File base)
    file_map = new HashMap<>();
    project_preferences = new LspBasePreferences(pm.getSystemPreferences());
    edit_parameters = new HashMap<>();
-   is_main = false;
 
    File f = new File(base_directory,".bubbles");
    if (!f.exists()) f.mkdir();
@@ -104,7 +102,6 @@ LspBaseProject(LspBaseMain lm,LspBaseProjectManager pm,String name,File base)
 	 addLspFile(fs,false);
        }
       project_preferences.loadXml(xml);
-      is_main = IvyXml.getAttrBool(xml,"ISMAIN");
     }
    is_open = false;
    use_protocol = null;
@@ -130,8 +127,6 @@ File getBasePath()				{ return base_directory; }
 // NobasePreferences getPreferences()		{ return nobase_prefs; }
 boolean isOpen()				{ return is_open; }
 boolean exists()				{ return base_directory.exists(); }
-boolean isMainProject()                         { return is_main; }
-void setMainProject()                           { is_main = true; }
 
 LspBaseProject [] getReferencedProjects()	{ return new LspBaseProject[0]; }
 LspBaseProject [] getReferencingProjects()	{ return new LspBaseProject[0]; }
@@ -607,9 +602,6 @@ void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolea
 
 
 
-
-
-
 /********************************************************************************/
 /*                                                                              */
 /*      Fully qualified name query                                              */
@@ -759,7 +751,6 @@ void outputXml(IvyXmlWriter xw)
    xw.begin("PROJECT");
    xw.field("NAME",project_name);
    xw.field("LANGUAGE",project_language);
-   xw.field("ISMAIN",is_main);
    xw.field("BASE",base_directory.getPath());
    for (LspBasePathSpec ps : project_paths) {
       ps.outputXml(xw);
@@ -783,7 +774,6 @@ void outputProject(boolean files,boolean paths,boolean clss,boolean opts,IvyXmlW
    xw.field("LANGUAGE",project_language);
    xw.field("PATH",base_directory.getPath());
    xw.field("WORKSPACE",project_manager.getWorkSpaceDirectory().getPath());
-   xw.field("ISMAIN",is_main);
 
    if (paths) {
       xw.begin("CLASSPATH");
@@ -810,7 +800,6 @@ private void outputFile(LspBaseFile fd,IvyXmlWriter xw)
    xw.begin("FILE");
    xw.field("NAME",fd.getPath());
    xw.field("LANGUAGE",fd.getLanguage());
-   xw.field("ISMAIN",is_main);
    xw.end("FILE");
 }
 

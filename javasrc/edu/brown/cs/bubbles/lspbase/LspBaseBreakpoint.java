@@ -364,7 +364,6 @@ private static class ExceptionBreakpoint extends LspBaseBreakpoint
          if (pnm != null) for_project = pm.findProject(pnm);
        }
       catch (LspBaseException e) { }
-      if (for_project == null) for_project = pm.getMainProject();
     }
    
    @Override BreakType getType()			{ return BreakType.EXCEPTION; }

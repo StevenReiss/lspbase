@@ -379,7 +379,10 @@ void setExceptionBreakpoint(String proj,
       boolean caught,boolean uncaught,boolean checked)
    throws LspBaseException
 {
-   LspBaseProject lbp = lsp_base.getProjectManager().findProject(proj);
+   LspBaseProject lbp = null;
+   if (proj != null) {
+      lbp = lsp_base.getProjectManager().findProject(proj);
+    }
    
    if (exception_breakpoint == null) {
       exception_breakpoint = LspBaseBreakpoint.createExceptionBreakpoint(lbp,caught,uncaught);
@@ -472,8 +475,7 @@ private void loadBreakpoints()
 {
    Element xml = IvyXml.loadXmlFromFile(config_file);
    if (xml == null) {
-      LspBaseProjectManager pm = lsp_base.getProjectManager();
-      exception_breakpoint = LspBaseBreakpoint.createExceptionBreakpoint(pm.getMainProject(),
+      exception_breakpoint = LspBaseBreakpoint.createExceptionBreakpoint(null,
             false,true);
       break_map.put(exception_breakpoint.getId(),exception_breakpoint);
     }
@@ -557,16 +559,22 @@ private void handleBreakNotify(LspBaseBreakpoint pb,String reason)
 
 
 
-void updateAllBreakpoints()
+void updateAllBreakpoints(LspBaseDebugProtocol proto)
 {
    Set<LspBaseFile> files = new HashSet<>();
    for (LspBaseBreakpoint pb : break_map.values()) {
       LspBaseFile lbf = pb.getFile();
-      if (lbf != null) files.add(lbf);
+      if (lbf != null) {
+         if (lbf.getLanguageData() == proto.getLanguage()) {
+            files.add(lbf);
+          }
+       }
     }
    for (LspBaseFile lbf : files) {
       updateBreakpointsForFile(lbf);
     }
+
+   updateExceptionBreakpoints(proto);
 }
 
 
@@ -603,6 +611,16 @@ private void updateBreakpointsForFile(LspBaseFile lbf)
 
 private void updateExceptionBreakpoints(LspBaseProject proj)
 {
+   for (LspBaseDebugProtocol proto : debug_protocols.values()) {
+      if (proj == null || proj.getLanguageData() == proto.getLanguage()) {
+         updateExceptionBreakpoints(proto);
+       }
+    }
+}
+
+
+private void updateExceptionBreakpoints(LspBaseDebugProtocol proto) 
+{
    JSONArray filters = new JSONArray();
    JSONArray filteropts = new JSONArray();
    JSONArray exceptopts = new JSONArray();
@@ -614,11 +632,11 @@ private void updateExceptionBreakpoints(LspBaseProject proj)
          // add to filters, filteropts, exceptopts
        }
     }
-   LspBaseDebugProtocol proto = getDebugProtocol(proj);
+   
    BreakpointsSet setter = new BreakpointsSet(use);
    proto.sendRequest("setExceptionBreakpoints",setter,
-       "filters",filters,"filterOptions",filteropts,
-       "exceptionOptions",exceptopts);
+         "filters",filters,"filterOptions",filteropts,
+         "exceptionOptions",exceptopts);
 }
 
 

@@ -149,7 +149,7 @@ private void handleInit(Object resp,JSONObject err)
 
 private void handleInitialized()
 {
-   debug_manager.updateAllBreakpoints();
+   debug_manager.updateAllBreakpoints(this);
    
    if (for_language.getCapabilityBool("debug.supportsConfigurationDoneRequest")) {
       localSendRequest("configurationDone",null,true,new JSONObject());
@@ -163,6 +163,20 @@ private void handleInitialized()
    
    LspLog.logD("Finished debug initialization");
 }
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Access methods                                                          */
+/*                                                                              */
+/********************************************************************************/
+
+LspBaseLanguageData getLanguage()
+{
+   return for_language;
+}
+
 
 
 /********************************************************************************/

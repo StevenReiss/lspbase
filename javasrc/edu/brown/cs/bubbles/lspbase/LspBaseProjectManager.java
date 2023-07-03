@@ -51,7 +51,6 @@ class LspBaseProjectManager implements LspBaseConstants
 private LspBaseMain	lsp_main;
 private File		work_space;
 private Map<String,LspBaseProject> all_projects;
-private LspBaseProject  main_project;
 private LspBasePreferences system_preferences;
 
 private static final String PROJECTS_FILE = ".projects";
@@ -77,7 +76,6 @@ LspBaseProjectManager(LspBaseMain nm) throws LspBaseException
 
    work_space = ws;
    all_projects = new TreeMap<>();
-   main_project = null;
 
    File pf1 = new File(ws,".preferences");
    system_preferences = new LspBasePreferences(pf1);
@@ -118,18 +116,11 @@ LspBaseProject findProject(String proj) throws LspBaseException
    return pp;
 }
 
-LspBaseProject getMainProject() 
-{
-   return main_project; 
-}
-
-
 
 File getWorkSpaceDirectory()
 {
    return lsp_main.getWorkSpaceDirectory();
 }
-
 
 
 
@@ -746,9 +737,6 @@ void handleGetAllNames(String proj,String bid,Set<String> files,String bkg,IvyXm
 
 
 
-
-
-
 private class NameThread extends Thread implements LspNamer {
 
    private String bump_id;
@@ -996,10 +984,6 @@ void loadProjects()
                if (first == null) first = bp;
              }
 	  }
-         if (main_project == null && first != null) {
-            first.setMainProject();
-            main_project = first;
-          }
          return;
        }
     }
@@ -1034,7 +1018,6 @@ private LspBaseProject loadProject(String nm,File pf)
    LspBaseProject p = new LspBaseProject(lsp_main,this,nm,pf);
 
    all_projects.put(p.getName(),p);
-   if (p.isMainProject()) main_project = p;
    
    return p;
 }
