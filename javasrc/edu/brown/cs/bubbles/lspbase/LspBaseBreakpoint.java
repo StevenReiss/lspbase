@@ -25,6 +25,7 @@ package edu.brown.cs.bubbles.lspbase;
 
 import javax.swing.text.Position;
 
+import org.json.JSONObject;
 import org.w3c.dom.Element;
 
 import edu.brown.cs.ivy.xml.IvyXml;
@@ -48,6 +49,8 @@ private String		debug_condition;
 private String          hit_condition;
 private String          log_message;
 private boolean 	condition_enabled;
+private int             external_id;
+private boolean         is_verified;
 
 
 private static IdCounter break_counter = new IdCounter();
@@ -67,9 +70,9 @@ static LspBaseBreakpoint createLineBreakpoint(LspBaseFile file,int line)
 
 
 
-static LspBaseBreakpoint createExceptionBreakpoint(LspBaseProject bp,boolean caught,boolean uncaught)
+static LspBaseBreakpoint createExceptionBreakpoint(LspBaseProject bp,String name,boolean caught,boolean uncaught)
 {
-   return new ExceptionBreakpoint(bp,caught,uncaught);
+   return new ExceptionBreakpoint(bp,name,caught,uncaught);
 }
 
 
@@ -99,6 +102,26 @@ static LspBaseBreakpoint createBreakpoint(Element xml) throws LspBaseException
 }
 
 
+static LspBaseBreakpoint createBreakpoint(JSONObject jbpt)
+{
+   JSONObject src = jbpt.optJSONObject("source");
+   if (src == null) return null;
+   String path = src.optString("path");
+   if (path == null) return null;
+   LspBaseFile file = LspBaseMain.getLspMain().getProjectManager().findFile(null,path);
+   int line = src.optInt("line",-1);
+   if (line < 0) return null;
+   LspBaseBreakpoint bpt = null;
+   try {
+      bpt = new LineBreakpoint(file,line);
+      bpt.setProtoInfo(jbpt);
+    }
+   catch (LspBaseException e) {
+      return null;
+    }
+   return bpt;
+}
+
 
 
 /********************************************************************************/
@@ -117,6 +140,8 @@ protected LspBaseBreakpoint()
    hit_condition = null;
    log_message = null;
    condition_enabled = false;
+   external_id = -1;
+   is_verified = false;
 }
 
 
@@ -152,6 +177,9 @@ String getCondition()			{ return debug_condition; }
 String getHitCondition()                { return hit_condition; }
 boolean isConditionEnabled()		{ return condition_enabled; }
 String getTraceLog()                    { return trace_log; }
+int getExternalId()                     { return external_id; }
+boolean isVerified()                    { return is_verified; }
+
 
 void setConditionEnabled(boolean e)	{ condition_enabled = e; }
 void setCondition(String c)
@@ -196,6 +224,14 @@ boolean isUncaught()			{ return false; }
 void clear()
 { }
  
+void setProtoInfo(JSONObject data) 
+{
+   is_verified = data.getBoolean("verified");
+   external_id = data.optInt("id",-1);
+   trace_log = data.optString("message",trace_log);
+   // TODO: check if we need to look at line,column,endline,endcolumn,source
+}
+
 
 
 /********************************************************************************/
@@ -345,10 +381,13 @@ private static class ExceptionBreakpoint extends LspBaseBreakpoint
    private boolean	is_caught;
    private boolean	is_uncaught;
    private LspBaseProject for_project;
+   private String       exception_name;
    
-   ExceptionBreakpoint(LspBaseProject bp,boolean c,boolean u) {
+   ExceptionBreakpoint(LspBaseProject bp,String name,boolean c,boolean u) {
       is_caught = c;
       is_uncaught = u;
+      for_project = bp;
+      exception_name = name;
     }
    
    ExceptionBreakpoint(Element xml) {
@@ -356,6 +395,8 @@ private static class ExceptionBreakpoint extends LspBaseBreakpoint
       is_caught = IvyXml.getAttrBool(xml,"ISCAUGHT");
       is_uncaught = IvyXml.getAttrBool(xml,"ISUNCAUGHT");
       String pnm = IvyXml.getAttrString(xml,"PROJECT");
+      exception_name = IvyXml.getAttrString(xml,"NAME");
+      if (exception_name != null && exception_name.isEmpty()) exception_name = null;
       
       for_project = null;
       LspBaseMain lsp = LspBaseMain.getLspMain();
@@ -370,11 +411,13 @@ private static class ExceptionBreakpoint extends LspBaseBreakpoint
    @Override public boolean isCaught()		        { return is_caught; }
    @Override public boolean isUncaught()		{ return is_uncaught; }
    @Override LspBaseProject getProject()                { return for_project; }
+   @Override public String getException()               { return exception_name; }
    
    @Override protected void outputLocalXml(IvyXmlWriter xw) {
       xw.field("ISCAUGHT",is_caught);
       xw.field("ISUNCAUGHT",is_uncaught);
       xw.field("PROJECT",for_project.getName());
+      if (exception_name != null) xw.field("NAME",exception_name);
     }
    
    @Override protected void outputLocalBubbles(IvyXmlWriter xw) {
@@ -386,6 +429,9 @@ private static class ExceptionBreakpoint extends LspBaseBreakpoint
       if (p == null) return;
       if (p.equals("CAUGHT")) is_caught = Boolean.parseBoolean(v);
       else if (p.equals("UNCAUGHT")) is_uncaught = Boolean.parseBoolean(v);
+      else if (p.equals("NAME") || p.equals("CLASS")) {
+         exception_name = v;
+       }
       else super.setProperty(p,v);
     }
    

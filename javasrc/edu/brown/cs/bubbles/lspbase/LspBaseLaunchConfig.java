@@ -23,7 +23,6 @@
 package edu.brown.cs.bubbles.lspbase;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +47,7 @@ private String config_name;
 private String config_id;
 private int	config_number;
 private File   base_file;
+private LspBaseProject for_project;
 private LspBaseLaunchConfig original_config;
 private LspBaseLaunchConfig working_copy;
 private boolean is_saved;
@@ -63,7 +63,7 @@ private static IdCounter launch_counter = new IdCounter();
 /*                                                                              */
 /********************************************************************************/
 
-LspBaseLaunchConfig(String nm)
+LspBaseLaunchConfig(LspBaseProject proj,String nm)
 {
    config_name = nm;
    config_number = launch_counter.nextValue();
@@ -73,6 +73,7 @@ LspBaseLaunchConfig(String nm)
    is_saved = false;
    working_copy = null;
    original_config = null;
+   for_project = proj;
 }
 
 
@@ -83,11 +84,21 @@ LspBaseLaunchConfig(Element xml)
    config_number = IvyXml.getAttrInt(xml,"ID");
    launch_counter.noteValue(config_number);
    config_id = "LAUNCH_" + Integer.toString(config_number);
+   String pnm = IvyXml.getAttrString(xml,"PROJECT_ATTR");
+   LspBaseProjectManager pm = LspBaseMain.getLspMain().getProjectManager();
+   try {
+      for_project = pm.findProject(pnm);
+    }
+   catch (LspBaseException e) {
+      for_project = null;
+    }
    
-   config_attrs = new HashMap<LspBaseConfigAttribute,String>();
+   config_attrs = new HashMap<>();
    for (Element ae : IvyXml.children(xml,"ATTR")) {
       LspBaseConfigAttribute attr = IvyXml.getAttrEnum(ae,"KEY",LspBaseConfigAttribute.NONE);
-      config_attrs.put(attr,IvyXml.getAttrString(ae,"VALUE"));
+      if (attr != LspBaseConfigAttribute.NONE) {
+         config_attrs.put(attr,IvyXml.getAttrString(ae,"VALUE"));
+       }
     }
    String fn = IvyXml.getTextElement(xml,"FILE");
    if (fn == null) base_file = null;
@@ -105,6 +116,7 @@ LspBaseLaunchConfig(String nm,LspBaseLaunchConfig orig)
    config_number = launch_counter.nextValue();
    config_id = "LAUNCH_" + Integer.toString(config_number);
    config_attrs = new HashMap<>(orig.config_attrs);
+   for_project = orig.for_project;
    base_file = orig.base_file;
    is_saved = false;
    working_copy = null;
@@ -119,6 +131,7 @@ LspBaseLaunchConfig(LspBaseLaunchConfig orig)
    config_number = orig.config_number;
    config_id = orig.config_id;
    config_attrs = new HashMap<>(orig.config_attrs);
+   for_project = orig.for_project;
    base_file = orig.base_file;
    is_saved = false;
    working_copy = null;
@@ -171,13 +184,13 @@ void commitWorkingCopy()
 public String getName() 			{ return config_name; }
 String getId()					{ return config_id; }
 void setName(String nm) 			{ config_name = nm; }
+LspBaseProject getProject()                     { return for_project; }
 
 public File getFileToRun()			{ return base_file; }
 public void setFileToRun(File f) {
    base_file = f;
    setAttribute(LspBaseConfigAttribute.MAIN_TYPE,f.getPath());
 }
-
 
 void setAttribute(LspBaseConfigAttribute k,String v)
 {
@@ -194,7 +207,7 @@ public String [] getEnvironment()		{ return null; }
 
 public File getWorkingDirectory()
 {
-   String s = config_attrs.get(LspBaseConfigAttribute.WD);
+   String s = config_attrs.get(LspBaseConfigAttribute.WORKING_DIRECTORY);
    if (s != null) {
       File f = new File(s);
       if (f.exists() && f.isDirectory()) return f;
@@ -205,10 +218,11 @@ public File getWorkingDirectory()
       if (pnm == null) return null;
       LspBaseProject pp = LspBaseMain.getLspMain().getProjectManager().findProject(pnm);
       if (pp == null) return null;
-      String files = config_attrs.get(LspBaseConfigAttribute.MAIN_TYPE);
-//    File f2 = pp.findModuleFile(files);
-//    File f3 = f2.getParentFile();
-//    return f3;
+      String file = config_attrs.get(LspBaseConfigAttribute.MAIN_TYPE);
+      if (file != null) {
+         LspBaseFile lbf = pp.findFile(file);
+         return lbf.getFile().getParentFile();
+       }
     }
    catch (LspBaseException e) { }
    
@@ -222,52 +236,40 @@ public String getEncoding()
 }
 
 
-
-public List<String> getCommandLine(LspBaseDebugManager dbg,int port) throws LspBaseException
+public String getConnectMap()
 {
-   List<String> cmdargs = new ArrayList<>();
-   
-   String pnm = config_attrs.get(LspBaseConfigAttribute.PROJECT_ATTR);
-   if (pnm == null) throw new LspBaseException("No project specified");
-   LspBaseProject pp = LspBaseMain.getLspMain().getProjectManager().findProject(pnm);
-   if (pp == null) throw new LspBaseException("Project " + pnm + " not found");
-   
-// File f1 = dbg.getNodeBinary();
-// cmdargs.add(f1.getPath());
-   // cmdargs.add("--inspect=" + port);
-// cmdargs.add("--inspect-brk=" + port);
-// addVmArgs(cmdargs);
-// 
-// String file = config_attrs.get(LspBaseConfigAttribute.MAIN_TYPE);
-// String filename = config_attrs.get(LspBaseConfigAttribute.FILE);
-// File f2 = null;
-// if (f2 == null && filename != null) f2 = new File(filename);
-// if (f2 != null) cmdargs.add(f2.getAbsolutePath());
-// 
-// addUserArgs(cmdargs);
-// 
-   return cmdargs;
+   return config_attrs.get(LspBaseConfigAttribute.CONNECT_MAP);
 }
 
 
-private void addVmArgs(List<String> cmdargs)
+public List<String> getProgramArguments()
 {
-   String args = config_attrs.get(LspBaseConfigAttribute.VM_ARGS);
-   if (args == null || args.length() == 0) return;
-   List<String> toks = IvyExec.tokenize(args);
-   cmdargs.addAll(toks);
+   String s = config_attrs.get(LspBaseConfigAttribute.PROGRAM_ARGUMENTS);
+   if (s == null) return null;
+   List<String> args = IvyExec.tokenize(s);
+   if (args.isEmpty()) return null;
+   return args;
 }
 
 
-
-private void addUserArgs(List<String> cmdargs)
+public List<String> getVMArguments()
 {
-   String args = config_attrs.get(LspBaseConfigAttribute.ARGS);
-   if (args == null || args.length() == 0) return;
-   List<String> toks = IvyExec.tokenize(args);
-   cmdargs.addAll(toks);
+   String s = config_attrs.get(LspBaseConfigAttribute.VM_ARGUMENTS);
+   if (s == null) return null;
+   List<String> args = IvyExec.tokenize(s);
+   if (args.isEmpty()) return null;
+   return args;
 }
 
+
+public List<String> getToolArguments()
+{
+   String s = config_attrs.get(LspBaseConfigAttribute.TOOL_ARGS);
+   if (s == null) return null;
+   List<String> args = IvyExec.tokenize(s);
+   if (args.isEmpty()) return null;
+   return args;
+}
 
 
 
@@ -304,6 +306,7 @@ void outputBubbles(IvyXmlWriter xw)
    xw.field("ID",config_id);
    xw.field("NAME",config_name);
    xw.field("WORKING",!is_saved);
+   xw.field("PROJECT",for_project.getName());
    xw.field("DEBUG",true);
    for (Map.Entry<LspBaseConfigAttribute,String> ent : config_attrs.entrySet()) {
       xw.begin("ATTRIBUTE");
@@ -318,7 +321,6 @@ void outputBubbles(IvyXmlWriter xw)
    xw.end("TYPE");
    xw.end("CONFIGURATION");
 }
-
 
 
 

@@ -197,7 +197,7 @@ private String handleCommand(String cmd,String proj,Element xml) throws LspBaseE
       case "ENTER" :
 	 if (num_clients == 0 && lspbase_pinger == null) {
 	    lspbase_pinger = new Pinger();
-	    lsp_base.scheduleTask(lspbase_pinger,30000,30000);
+	    lsp_base.scheduleTask(lspbase_pinger,10000,10000);
 	  }
 	 ++num_clients;
 	 xw.text(Integer.toString(num_clients));
@@ -441,7 +441,7 @@ private class Pinger extends TimerTask {
       String rslt = finishMessageWait(xw,1000);
       if (rslt == null) {
          ++error_count;
-         if (error_count > 5) {
+         if (error_count > 3) {
             num_clients = 0;
             shutdown_mint = true;
             mint_control.shutDown();

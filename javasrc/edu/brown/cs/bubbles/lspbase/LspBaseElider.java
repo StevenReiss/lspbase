@@ -113,7 +113,7 @@ LspBaseElider(LspBaseFile file)
    jarr = (JSONArray) prop1;
    token_modifiers = new String[jarr.length()];
    for (int i = 0; i < jarr.length(); ++i) {
-      token_modifiers[i] = jarr.getString(i);
+       token_modifiers[i] = jarr.getString(i);
     }
    
    LspBaseLanguageData lld = file.getLanguageData();

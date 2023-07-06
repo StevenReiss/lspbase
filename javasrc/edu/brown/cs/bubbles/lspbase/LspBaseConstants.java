@@ -185,13 +185,18 @@ enum BreakType {
 enum LspBaseConfigAttribute {
    NONE,
    PROJECT_ATTR,
-   ARGS,
-   VM_ARGS,
+   PROGRAM_ARGUMENTS,
+   VM_ARGUMENTS,
    MAIN_TYPE,
-   WD,
+   WORKING_DIRECTORY,
    ENCODING,
    NAME,
    FILE,
+   DEBUG_LIBRARIES,
+   TOOL_ARGS,
+   CAPTURE_IN_FILE,
+   ENVIRONMENT,
+   CONNECT_MAP,
 }
 
 enum LspBaseDebugAction {

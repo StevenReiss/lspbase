@@ -54,7 +54,7 @@ public static void main(String [] args)
    
    lbm.start();
    
-   lbm.shutDown();
+   lbm.waitForShutDown();
 }
 
 
@@ -97,7 +97,7 @@ static {
    dartcmd += " --client-id=$(ID)";
    dartcmd += " --client-version=1.2";
    dartcmd += " --protocol=lsp";
-   String dapcmd = "dart debug_adapter";
+   String dapcmd = "flutter debug_adapter";
    dapcmd += " --test";
    exec_map.put("dart",new LspBaseLanguageData("dart",dartcmd,
          dapcmd,".dart",false));
@@ -258,12 +258,19 @@ private void start()
 }
 
 
-private void shutDown()
+private void waitForShutDown()
 {
+   lsp_monitor.waitForShutDown();
+   
+   LspLog.logD("Start shutdown");
+   
    for (LspBaseProtocol proto : workspace_protocols.values()) {
       proto.shutDown();
     }
-   lsp_monitor.waitForShutDown();
+   
+   LspLog.logD("Exiting");
+   
+   System.exit(0);
 }
 
 

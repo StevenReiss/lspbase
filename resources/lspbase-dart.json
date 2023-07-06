@@ -325,6 +325,23 @@
 	"supportsMemoryEvent" : true,
 	"supportsArgsCanBeInterpretedByShell" : false,
 	"supportsStartDebuggingRequest" : true
+      },
+     "launchData" : {
+	debugExternalPackageLibraries" : false,
+	"debugSdkLibraries" : false,
+	"showGettersInDebugViews" : true,
+	"evaluateGettersInDebugViews" : true,
+	"evaluateToStringInDebugViews" : false,
+	"sendLogsToClient" : true,
+	"additionalProjectPaths": [ ],
+	"cwd" : "$WD",
+	"env" : "$ENV",
+	"sendCustomProgressEvents" : true,
+	"noDebug" : false,
+	"program" : "$START",
+	"args" : "$ARGS",
+	"toolArgs" : "$TOOLARGS",
+	"vmAdditionalArgs" : "$VMARGS"
       }
     },
   lspbaseConfiguration: {
@@ -340,9 +357,36 @@
 	"poundComments" : false,
 	"textBlocks" : true,
 	"backquoteBlocks" : false
+      },
+     "exceptionBreakpoints" : {
+	"filter" : {
+	   "uncaught" : "Unhandled",
+	   "caught" : "All",
+	   "always" : "All"
+	 }
+       },
+     "launchConfiguration" : {
+	"attributes" : [ "PROJECT_ATTR","PROGRAM_ARGUMENTS","VM_ARGUMENTS", "MAIN_TYPE",
+			 "WORKING_DIRECTORY", "NAME", "FILE", "DEBUG_LIBRARIES", "TOOL_ARGS" ,
+			 "CAPTURE_IN_FILE" ]
       }
-   }
+    }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

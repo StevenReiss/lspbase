@@ -62,10 +62,19 @@ class LspBaseDebugProtocol implements LspBaseConstants
 /*                                                                              */
 /********************************************************************************/
 
+enum InitState {
+   UNINIT, 
+   START_INIT,
+   INIT_RECEIVED,
+   INIT_EVENT, 
+   DONE_SENT, 
+   INITIALIZED,
+};
+   
+private LspBaseDebugTarget debug_target;
 private Map<Integer,LspResponder> pending_map;
 private String client_id;
-private boolean is_initialized;
-private boolean doing_initialization;
+private InitState init_state;
 private LspBaseLanguageData for_language;
 private Writer message_stream;
 private JSONObject config_data;
@@ -81,9 +90,10 @@ private static AtomicLong progress_counter = new AtomicLong(1);
 /*                                                                              */
 /********************************************************************************/
 
-LspBaseDebugProtocol(LspBaseDebugManager mgr,LspBaseLanguageData ld)
+LspBaseDebugProtocol(LspBaseDebugManager mgr,LspBaseDebugTarget tgt,LspBaseLanguageData ld)
 {
    debug_manager = mgr;
+   debug_target = tgt;
    pending_map = new HashMap<>();
    for_language = ld;
    config_data = for_language.getDebugConfiguration();
@@ -91,10 +101,12 @@ LspBaseDebugProtocol(LspBaseDebugManager mgr,LspBaseLanguageData ld)
    String nm = LspBaseMain.getLspMain().getWorkSpaceDirectory().getName();
    client_id = ld.getName() + "_LSP_" + nm;          
         
-   String command = ld.getLspExecString();
+   String command = ld.getDapExecString();
+   if (command == null) return;
+   
    Map<String,String> keys = new HashMap<>();
    command = IvyFile.expandName(command,keys);
-   LspLog.logD("Run debug server: " + command);
+   LspLog.logD("DEBUG: Run server: " + command);
    
    try {
       IvyExec exec = new IvyExec(command,IvyExec.PROVIDE_INPUT | IvyExec.READ_OUTPUT | IvyExec.READ_ERROR);
@@ -108,8 +120,7 @@ LspBaseDebugProtocol(LspBaseDebugManager mgr,LspBaseLanguageData ld)
     }
    catch (IOException e) { }
    
-   is_initialized = false;
-   doing_initialization = false;
+   init_state = InitState.UNINIT;
 }
 
 
@@ -123,16 +134,19 @@ LspBaseDebugProtocol(LspBaseDebugManager mgr,LspBaseLanguageData ld)
 void initialize()
 {
    synchronized (this) {
-      while (doing_initialization) {
-	 try {
-	    wait(5000);
-	  }
-	 catch (InterruptedException e) { }
+      if (init_state != InitState.UNINIT) {
+         waitForInitialization();
+         return;
        }
-      if (is_initialized) return;
-      doing_initialization = true;
+      init_state = InitState.START_INIT;
     }
    
+   sendInitialize();
+}
+
+
+private void sendInitialize()
+{
    JSONObject args = config_data.getJSONObject("initialize");
    args.put("clientID",client_id);
    localSendRequest("initialize",this::handleInit,true,args);
@@ -140,28 +154,84 @@ void initialize()
 
 
 
+void waitForInitialization() 
+{
+   if (init_state == InitState.INITIALIZED) return;
+   if (init_state == InitState.UNINIT) initialize();
+   
+   synchronized (this) {
+      while (init_state != InitState.INITIALIZED) {
+         try {
+            wait(5000);
+          }
+         catch (InterruptedException e) { }
+       }
+    }
+}
+
+
+void waitForPreInitialization() 
+{
+   if (init_state == InitState.INITIALIZED) return;
+   
+   synchronized (this) {
+      if (init_state == InitState.UNINIT) {
+         init_state = InitState.START_INIT;
+         sendInitialize();
+       }
+    }
+   
+   synchronized (this) {
+      for ( ; ; ) {
+         switch (init_state) {
+            case INITIALIZED :
+            case DONE_SENT :
+            case INIT_EVENT :
+               return;
+            case INIT_RECEIVED :
+            case START_INIT :
+               break;
+          }
+         try {
+            wait(5000);
+          }
+         catch (InterruptedException e) { }
+       }
+    }
+}
+
+
 private void handleInit(Object resp,JSONObject err)
 {
    JSONObject caps = (JSONObject) resp;
    for_language.setCapabilities("debug",caps);
+   
+   LspLog.logD("DEBUG: Received capabilities " + caps.toString(2));
+   
+   init_state = InitState.INIT_RECEIVED;
 }
 
 
 private void handleInitialized()
 {
+   init_state = InitState.INIT_EVENT; 
+   
+   LspLog.logD("DEBUG: initialized event");
+   
    debug_manager.updateAllBreakpoints(this);
+   
+   init_state = InitState.DONE_SENT;
    
    if (for_language.getCapabilityBool("debug.supportsConfigurationDoneRequest")) {
       localSendRequest("configurationDone",null,true,new JSONObject());
     }
    
    synchronized (this) {
-      doing_initialization = false;
-      is_initialized = true;
+      init_state = InitState.INITIALIZED;
       notifyAll();
     }
    
-   LspLog.logD("Finished debug initialization");
+   LspLog.logD("DEBUG: Finished initialization");
 }
 
 
@@ -192,6 +262,16 @@ void sendRequest(String method,LspResponder resp,Object ... params)
 }
 
 
+void sendEarlyRequest(String method,LspResponder resp,Object ... params)
+{
+   JSONObject obj = createJson(params);
+   
+   waitForPreInitialization();
+   
+   localSendRequest(method,resp,true,obj);
+}
+
+
 String sendWorkRequest(String method,LspResponder resp,Object ... params)
 {
    String tok = "WORK_" + progress_counter.getAndIncrement();
@@ -203,7 +283,7 @@ String sendWorkRequest(String method,LspResponder resp,Object ... params)
 
 void sendJsonRequest(String method,LspResponder resp,JSONObject params)
 {
-   if (!is_initialized) initialize();
+   waitForInitialization();
    
    localSendRequest(method,resp,true,params);
 }
@@ -214,6 +294,8 @@ private void localSendRequest(String method,LspResponder resp,boolean wait,JSONO
 {
    int id = id_counter.getAndIncrement();
    JSONObject jo = new JSONObject();
+// jo.put("jsonrpc","2.0");
+// jo.put("id",id);
    jo.put("seq",id);
    jo.put("type","request");
    jo.put("command",method);
@@ -228,7 +310,7 @@ private void localSendRequest(String method,LspResponder resp,boolean wait,JSONO
    buf.append("\r\n");
    buf.append(cnts);
    
-   LspLog.logD("Send: " + id + " " + method + " " + jo.toString(2));
+   LspLog.logD("DEBUG: Send " + id + " " + method + " " + len + " " + jo.toString(2));
    
    if (wait && resp == null) resp = this::dummyHandler;
    
@@ -240,7 +322,7 @@ private void localSendRequest(String method,LspResponder resp,boolean wait,JSONO
 	 message_stream.flush();
        }
       catch (IOException e) {
-	 LspLog.logE("Problem writing message",e);
+	 LspLog.logE("DEBUG: Problem writing message",e);
        }
     }
    
@@ -259,11 +341,10 @@ private void localSendRequest(String method,LspResponder resp,boolean wait,JSONO
 
 
 
-
 private void dummyHandler(Object resp,JSONObject err)
 {
    if (err != null) {
-      LspLog.logE("Unexpected error response: " + err);
+      LspLog.logE("DEBUG: Unexpected error response: " + err);
     }
 }
 
@@ -278,7 +359,7 @@ void processResponse(JSONObject resp)
 {
    int id = resp.optInt("seq");
    LspResponder lsp = pending_map.get(id);
-   LspLog.logD("Debug Reply: " + id + (lsp != null) + " " + resp.toString(2));
+   LspLog.logD("DEBUG: Reply " + id + " " + (lsp != null) + " " + resp.toString(2));
    
    try {
       if (resp.getBoolean("success")) {
@@ -294,7 +375,7 @@ void processResponse(JSONObject resp)
        }
     }
    catch (Throwable t) {
-      LspLog.logE("Problem processing response",t);
+      LspLog.logE("DEBUG: Problem processing response",t);
     }
    finally {
       synchronized (this) {
@@ -309,18 +390,31 @@ void processEvent(JSONObject resp)
 { 
    String event = resp.getString("event");
    Object data = resp.opt("body");
-   int id = resp.getInt("seq");
+   JSONObject body = null;
+   if (data instanceof JSONObject) body = (JSONObject) data;
+// int id = resp.getInt("seq");
    switch (event) {
       case "initialized" :
          handleInitialized();
          break; 
       case "breakpoint" :
+         debug_manager.handleBreakpointEvent(body);
          break;
       case "capabilities" :
+         JSONObject caps = body.getJSONObject("capabilities");
+         for_language.setCapabilities("debug",caps);
          break;
+      case "process" :
+      case "thread" :
+      case "stopped" :
       case "continued" :
+      case "output" :
+      case "terminated" :
+         debug_target.processEvent(event,body);
          break;
       case "exited" :
+         break;
+      case "module" :
          break;
       case "invalidated" :
          break;
@@ -328,26 +422,14 @@ void processEvent(JSONObject resp)
          break;
       case "memory" :
          break;
-      case "module" :
-         break;
-      case "output" :
-         break;
-      case "process" :
-         break;
       case "progressEnd" :
          break;
       case "progessStart" :
          break;
       case "progressUpdated" :
          break;
-      case "Stopped" :
-         break;
-      case "Terminated" :
-         break;
-      case "Thread" :
-         break;
       default :
-         LspLog.logE("Unknown event " + resp.toString(2));
+         LspLog.logE("DEBUG: Unknown event " + resp.toString(2));
          break;
     }
 }
@@ -385,7 +467,7 @@ private class MessageReader extends Thread {
                    }
                   String rslt = new String(buf,0,rln);
                   JSONObject jobj = new JSONObject(rslt);
-                  //		  LspLog.logD("Received: " + clen + " " + rln + "::\n" + jobj.toString(2));
+                  LspLog.logD("DEBUG: Received " + clen + " " + rln + "::\n" + jobj.toString(2));
                   process(jobj);
                   clen = -1;
                 }
@@ -430,7 +512,7 @@ private class MessageReader extends Thread {
             break;
          case "request" :
          default :
-            LspLog.logE("Unexpected debug message of type " + type + " " + reply.toString(2));
+            LspLog.logE("DEBUG: Unexpected message of type " + type + " " + reply.toString(2));
             break;
        }
     }
