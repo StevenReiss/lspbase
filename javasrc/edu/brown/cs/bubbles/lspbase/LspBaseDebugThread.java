@@ -45,6 +45,7 @@ class LspBaseDebugThread implements LspBaseConstants
 enum ThreadState { INIT, RUNNING, STOPPED, TERMINATED };
 
 private int     thread_id;
+private String  thread_name;
 private ThreadState thread_state;
 private LspBaseDebugTarget debug_target;
 private List<LspBaseBreakpoint> cur_breakpoints;
@@ -71,12 +72,15 @@ static {
 /*                                                                              */
 /********************************************************************************/
 
-LspBaseDebugThread(LspBaseDebugTarget tgt,int id)
+LspBaseDebugThread(LspBaseDebugTarget tgt,int id,boolean first)
 { 
    debug_target = tgt;
    thread_id = id;
    thread_state = ThreadState.INIT;
    cur_breakpoints = null;
+   thread_name = "Thread_" + id;
+   if (first) thread_name = "Main Thread";
+         
 }
 
 
@@ -88,7 +92,7 @@ LspBaseDebugThread(LspBaseDebugTarget tgt,int id)
 /********************************************************************************/
 
 
-String getName()                                { return null; }
+String getName()                                { return thread_name; }
 int getId()                                     { return thread_id; }
 
 boolean isStopped()
@@ -96,7 +100,7 @@ boolean isStopped()
    return thread_state == ThreadState.STOPPED;
 }
 
-private LspBaseDebugProtocol getProtocol()
+LspBaseDebugProtocol getProtocol()
 {
    return debug_target.getDebugProtocol();
 }
@@ -121,7 +125,33 @@ List<LspBaseDebugStackFrame> getStackFrames()
          "threadId",getId(),"startFrame",0,
          "levels",0,"format",format);
    
+   // for each frame, do a scope command followed by variabless
+   for (LspBaseDebugStackFrame frm : sf.getFrames()) {
+      if (frm.getBaseFile() != null) {
+         proto.sendRequest("scopes",new FrameScoper(frm),
+               "frameid",frm.getId());
+         frm.loadVariables(1);
+       }
+    }
+ 
    return sf.getFrames();
+}
+
+
+
+private class FrameScoper implements LspResponder {
+   
+   private LspBaseDebugStackFrame for_frame;
+   
+   FrameScoper(LspBaseDebugStackFrame frm) {
+      for_frame = frm;
+    }
+   
+   @Override public void handleResponse(Object data,JSONObject err) {
+      JSONObject body = (JSONObject) data;
+      JSONArray scps = body.getJSONArray("scopes");
+      for_frame.addScopes(scps);
+    }
 }
 
 
@@ -141,7 +171,7 @@ private class StackFramer implements LspResponder {
          JSONArray frames = body.getJSONArray("stackFrames");
          for (int i = 0; i < frames.length(); ++i) {
             JSONObject frame = frames.getJSONObject(i);
-            LspBaseDebugStackFrame frm = new LspBaseDebugStackFrame(i,frame);
+            LspBaseDebugStackFrame frm = new LspBaseDebugStackFrame(LspBaseDebugThread.this,i,frame);
             cur_frames.add(frm);
           }
        }
@@ -288,19 +318,19 @@ void handleStopped(JSONObject data)
          if (bpt != null) cur_breakpoints.add(bpt);
        }
     }
-   debug_target.postThreadEvent(this,"CHANGED",detail,text,false);
+   debug_target.postThreadEvent(this,"CHANGE",detail,text,false);
 }
 void handleContinued(JSONObject data)           
 { 
    thread_state = ThreadState.RUNNING;
    cur_breakpoints = null;
-   debug_target.postThreadEvent(this,"CHANGED",null,null,false);
+   debug_target.postThreadEvent(this,"CHANGE",null,null,false);
 }
 void handleTerminated()                        
 { 
    thread_state = ThreadState.TERMINATED;
    // possibly keep restart data here
-   debug_target.postThreadEvent(this,"CHANGED",null,null,false);
+   debug_target.postThreadEvent(this,"CHANGE",null,null,false);
 }
 
 
@@ -314,7 +344,11 @@ void handleTerminated()
 void outputXml(IvyXmlWriter xw)
 {
    xw.begin("THREAD");
-   xw.field("NAME",getName());
+   String nm = getName();
+   if (nm != null) xw.field("NAME",nm);
+   else {
+      
+    }
    xw.field("ID",getId());
    xw.field("STACK",thread_state == ThreadState.STOPPED);
    // check for system thread

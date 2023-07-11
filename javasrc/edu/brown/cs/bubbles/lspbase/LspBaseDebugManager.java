@@ -189,8 +189,10 @@ void handleCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
          break;
       case "GETSTACKFRAMES" :
          getStackFrames(IvyXml.getAttrString(xml,"LAUNCH"),
+               IvyXml.getAttrInt(xml,"THREAD",0),
                IvyXml.getAttrInt(xml,"COUNT",-1),
-               IvyXml.getAttrInt(xml,"DEPTH",0),xw);
+               IvyXml.getAttrInt(xml,"DEPTH",0),
+               IvyXml.getAttrInt(xml,"ARRAY",100),xw);
          break;
       case "VARVAL" :
          getVariableValue(IvyXml.getAttrString(xml,"FRAME"),
@@ -285,10 +287,6 @@ void editRunConfiguration(String id,LspBaseConfigAttribute prop,String value,Ivy
    cfg = cfg.getWorkingCopy();
    if (prop == LspBaseConfigAttribute.NAME) {
       cfg.setName(value);
-    }
-   else if (prop.equals(LspBaseConfigAttribute.MAIN_TYPE)) {
-      File f = new File(value);
-      cfg.setFileToRun(f);
     }
    else {
       cfg.setAttribute(prop,value);
@@ -838,7 +836,7 @@ void consoleInput(String launch,String input)
 /*										*/
 /********************************************************************************/
 
-void getStackFrames(String launchid,int count,int depth,IvyXmlWriter xw)
+void getStackFrames(String launchid,int tid,int count,int depth,int arrsz,IvyXmlWriter xw)
    throws LspBaseException
 {
    int lid = 0;
@@ -852,21 +850,7 @@ void getStackFrames(String launchid,int count,int depth,IvyXmlWriter xw)
    xw.begin("STACKFRAMES");
    for (LspBaseDebugTarget tgt : target_map.values()) {
       if (launchid != null && tgt.getId() != lid) continue;
-      LspBaseDebugThread thrd = tgt.findThreadById(0);
-      if (thrd != null) {
-	 xw.begin("THREAD");
-	 xw.field("NAME",thrd.getName());
-	 xw.field("ID",thrd.getId());
-	 xw.field("TARGET",tgt.getId());
-	 int ctr = 0;
-	 for (LspBaseDebugStackFrame frm : thrd.getStackFrames()) {
-	    if (frm == null) continue;
-	    frm.outputXml(xw,ctr,depth);
-	    if (count > 0 && ctr > count) break;
-	    ++ctr;
-	  }
-	 xw.end("THREAD");
-       }
+      tgt.getStackFrames(tid,count,depth,arrsz,xw);
     }
    xw.end("STACKFRAMES");
 }

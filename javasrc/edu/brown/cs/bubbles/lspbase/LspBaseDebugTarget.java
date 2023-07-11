@@ -100,7 +100,8 @@ LspBaseDebugThread findThreadById(int id)
 {
    LspBaseDebugThread th = thread_data.get(id);
    if (th == null) {
-      th = new LspBaseDebugThread(this,id);
+      boolean first = thread_data.isEmpty();
+      th = new LspBaseDebugThread(this,id,first);
       thread_data.put(id,th);
     }
    return th;
@@ -207,7 +208,8 @@ private JSONObject fixDebugInfo(JSONObject data)
 	 Object sub = null;
 	 switch (s) {
 	    case "$WD" :
-	       sub = launch_config.getWorkingDirectory().getPath();
+	       File wd = launch_config.getWorkingDirectory();
+               if (wd != null) sub = wd.getPath();
 	       break;
 	    case "$ENV" :
 	       sub = new JSONObject();
@@ -333,6 +335,34 @@ JSONObject runInTerminal(JSONObject cmd)
    return createJson("processId",cur_exec.getPid());
 }
 
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*     Stack processing                                                         */
+/*                                                                              */
+/********************************************************************************/
+
+void getStackFrames(int tid,int count,int depth,int arrsz,IvyXmlWriter xw)
+{
+   for (LspBaseDebugThread thrd : thread_data.values()) {
+      if (tid <= 0 || tid == thrd.getId()) {
+         xw.begin("THREAD");
+	 xw.field("NAME",thrd.getName());
+	 xw.field("ID",thrd.getId());
+	 xw.field("TARGET",getId());
+	 int ctr = 0;
+	 for (LspBaseDebugStackFrame frm : thrd.getStackFrames()) {
+	    if (frm == null) continue;
+	    frm.outputXml(xw,ctr,depth);
+	    if (count > 0 && ctr > count) break;
+	    ++ctr;
+	  }
+	 xw.end("THREAD");
+       }
+    }
+}
 
 
 /********************************************************************************/

@@ -46,7 +46,6 @@ class LspBaseLaunchConfig implements LspBaseConstants
 private String config_name;
 private String config_id;
 private int	config_number;
-private File   base_file;
 private LspBaseProject for_project;
 private LspBaseLaunchConfig original_config;
 private LspBaseLaunchConfig working_copy;
@@ -69,7 +68,6 @@ LspBaseLaunchConfig(LspBaseProject proj,String nm)
    config_number = launch_counter.nextValue();
    config_id = "LAUNCH_" + Integer.toString(config_number);
    config_attrs = new HashMap<>();
-   base_file = null;
    is_saved = false;
    working_copy = null;
    original_config = null;
@@ -100,9 +98,6 @@ LspBaseLaunchConfig(Element xml)
          config_attrs.put(attr,IvyXml.getAttrString(ae,"VALUE"));
        }
     }
-   String fn = IvyXml.getTextElement(xml,"FILE");
-   if (fn == null) base_file = null;
-   else base_file = new File(fn);
    is_saved = true;
    working_copy = null;
    original_config = null;
@@ -117,7 +112,6 @@ LspBaseLaunchConfig(String nm,LspBaseLaunchConfig orig)
    config_id = "LAUNCH_" + Integer.toString(config_number);
    config_attrs = new HashMap<>(orig.config_attrs);
    for_project = orig.for_project;
-   base_file = orig.base_file;
    is_saved = false;
    working_copy = null;
    original_config = null;
@@ -132,7 +126,6 @@ LspBaseLaunchConfig(LspBaseLaunchConfig orig)
    config_id = orig.config_id;
    config_attrs = new HashMap<>(orig.config_attrs);
    for_project = orig.for_project;
-   base_file = orig.base_file;
    is_saved = false;
    working_copy = null;
    original_config = orig;
@@ -167,7 +160,6 @@ void commitWorkingCopy()
     }
    else if (working_copy != null) {
       config_name = working_copy.config_name;
-      base_file = working_copy.base_file;
       config_attrs = new HashMap<>(working_copy.config_attrs);
       working_copy = null;
     }
@@ -186,11 +178,6 @@ String getId()					{ return config_id; }
 void setName(String nm) 			{ config_name = nm; }
 LspBaseProject getProject()                     { return for_project; }
 
-public File getFileToRun()			{ return base_file; }
-public void setFileToRun(File f) {
-   base_file = f;
-   setAttribute(LspBaseConfigAttribute.MAIN_TYPE,f.getPath());
-}
 
 void setAttribute(LspBaseConfigAttribute k,String v)
 {
@@ -218,7 +205,8 @@ public File getWorkingDirectory()
       if (pnm == null) return null;
       LspBaseProject pp = LspBaseMain.getLspMain().getProjectManager().findProject(pnm);
       if (pp == null) return null;
-      String file = config_attrs.get(LspBaseConfigAttribute.MAIN_TYPE);
+      String file = config_attrs.get(LspBaseConfigAttribute.FILE);
+      if (file == null) file = config_attrs.get(LspBaseConfigAttribute.MAIN_TYPE);
       if (file != null) {
          LspBaseFile lbf = pp.findFile(file);
          return lbf.getFile().getParentFile();
@@ -233,6 +221,16 @@ public File getWorkingDirectory()
 public String getEncoding()
 {
    return config_attrs.get(LspBaseConfigAttribute.ENCODING);
+}
+
+public File getFileToRun()
+{
+   String cn = config_attrs.get(LspBaseConfigAttribute.FILE);
+   if (cn == null) {
+      cn = config_attrs.get(LspBaseConfigAttribute.MAIN_TYPE);
+    }
+   if (cn == null) return null;
+   return new File(cn);
 }
 
 
@@ -289,7 +287,6 @@ void outputSaveXml(IvyXmlWriter xw)
    xw.begin("LAUNCH");
    xw.field("NAME",config_name);
    xw.field("ID",config_number);
-   xw.textElement("FILE",base_file);
    for (Map.Entry<LspBaseConfigAttribute,String> ent : config_attrs.entrySet()) {
       xw.begin("ATTR");
       xw.field("KEY",ent.getKey());

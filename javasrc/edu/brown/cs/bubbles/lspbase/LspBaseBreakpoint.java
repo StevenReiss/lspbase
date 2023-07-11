@@ -230,6 +230,7 @@ void setProtoInfo(JSONObject data)
    is_verified = data.getBoolean("verified");
    external_id = data.optInt("id",-1);
    trace_log = data.optString("message",trace_log);
+   
    // TODO: check if we need to look at line,column,endline,endcolumn,source
 }
 
@@ -355,6 +356,16 @@ private static class LineBreakpoint extends LspBaseBreakpoint
    @Override void clear() {
       file_data = null;
       file_position = null;
+    }
+   
+   @Override void setProtoInfo(JSONObject data) {
+      super.setProtoInfo(data);
+      int line = data.getInt("line");
+      int col = data.optInt("column",1);
+      int off = file_data.mapLineCharToOffset(line,col);
+      if (off != file_position.getOffset()) {
+         file_position = file_data.createPosition(off);
+       }
     }
    
    @Override protected void outputLocalXml(IvyXmlWriter xw) {
