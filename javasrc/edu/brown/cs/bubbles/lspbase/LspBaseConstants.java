@@ -197,6 +197,7 @@ enum LspBaseConfigAttribute {
    CAPTURE_IN_FILE,
    ENVIRONMENT,
    CONNECT_MAP,
+   DEVICE,
 }
 
 enum LspBaseDebugAction {
@@ -280,6 +281,11 @@ public default JSONArray createJsonArray(Object ... elts)
     }
    return jarr;
 }
+
+
+
+
+
 
 
 

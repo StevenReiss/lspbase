@@ -1,21 +1,21 @@
 /********************************************************************************/
-/*                                                                              */
-/*              LspBaseMain.java                                                */
-/*                                                                              */
-/*      Main program for LSP-based back end for code bubbles                    */
-/*                                                                              */
+/*										*/
+/*		LspBaseMain.java						*/
+/*										*/
+/*	Main program for LSP-based back end for code bubbles			*/
+/*										*/
 /********************************************************************************/
-/*      Copyright 2011 Brown University -- Steven P. Reiss                    */
+/*	Copyright 2011 Brown University -- Steven P. Reiss		      */
 /*********************************************************************************
- *  Copyright 2011, Brown University, Providence, RI.                            *
- *                                                                               *
- *                        All Rights Reserved                                    *
- *                                                                               *
- * This program and the accompanying materials are made available under the      *
+ *  Copyright 2011, Brown University, Providence, RI.				 *
+ *										 *
+ *			  All Rights Reserved					 *
+ *										 *
+ * This program and the accompanying materials are made available under the	 *
  * terms of the Eclipse Public License v1.0 which accompanies this distribution, *
- * and is available at                                                           *
- *      http://www.eclipse.org/legal/epl-v10.html                                *
- *                                                                               *
+ * and is available at								 *
+ *	http://www.eclipse.org/legal/epl-v10.html				 *
+ *										 *
  ********************************************************************************/
 
 
@@ -51,9 +51,9 @@ public class LspBaseMain implements LspBaseConstants
 public static void main(String [] args)
 {
    LspBaseMain lbm = new LspBaseMain(args);
-   
+
    lbm.start();
-   
+
    lbm.waitForShutDown();
 }
 
@@ -61,22 +61,22 @@ public static void main(String [] args)
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Private Storage                                                         */
-/*                                                                              */
+/*										*/
+/*	Private Storage 							*/
+/*										*/
 /********************************************************************************/
 
 private File			root_directory;
-private String                  mint_handle;
-private LspBaseMonitor          lsp_monitor;
+private String			mint_handle;
+private LspBaseMonitor		lsp_monitor;
 private LspBaseProjectManager	project_manager;
-private LspBaseDebugManager     debug_manager;
+private LspBaseDebugManager	debug_manager;
 
 // private LspBaseEditor		lspbase_editor;
 // private LspBaseFileManager	file_manager;
 // private LspBaseSearch		lspbase_search;
 // private LspBaseDebugManager	lspbase_debug;
-// private IParser 		lspbase_parser;
+// private IParser		lspbase_parser;
 private File			work_directory;
 private LspBaseThreadPool	thread_pool;
 private Timer			lsp_timer;
@@ -92,15 +92,12 @@ private static final Map<String,LspBaseLanguageData> exec_map;
 static {
    exec_map = new HashMap<>();
    String dartcmd = "dart language-server";
-   dartcmd += " --protocol-traffic-log=.darttraffic";
-   dartcmd += " --analysis-driver-log=.dartanalysis";
    dartcmd += " --client-id=$(ID)";
    dartcmd += " --client-version=1.2";
    dartcmd += " --protocol=lsp";
    String dapcmd = "flutter debug_adapter";
-   dapcmd += " --test";
    exec_map.put("dart",new LspBaseLanguageData("dart",dartcmd,
-         dapcmd,".dart",false));
+	 dapcmd,".dart",false));
 }
 
 
@@ -109,23 +106,23 @@ static {
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Constructors                                                            */
-/*                                                                              */
+/*										*/
+/*	Constructors								*/
+/*										*/
 /********************************************************************************/
 
-public static LspBaseMain getLspMain()	        { return lspbase_main; }
+public static LspBaseMain getLspMain()		{ return lspbase_main; }
 
 
 
 private LspBaseMain(String [] args)
 {
    lspbase_main = this;
-   
+
    String rd = System.getProperty("edu.brown.cs.bubbles.lspbase.ROOT");
    if (rd == null) rd = "/pro/bubbles";
    root_directory = new File(rd);
-   
+
    String hm = System.getProperty("user.home");
    File f1 = new File(hm);
    File f2 = new File(f1,".bubbles");
@@ -141,24 +138,24 @@ private LspBaseMain(String [] args)
    
    thread_pool = new LspBaseThreadPool();
    lsp_timer = new Timer("LspBaseTimer",true);
-   
+
    scanArgs(args);
-   
+
    if (!work_directory.exists()) {
       work_directory.mkdirs();
     }
-   
+
    active_protocols = new HashMap<>();
    workspace_protocols = new HashMap<>();
-   
+
    LspLog.logI("STARTING");
 }
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Argument Scanning Methods                                               */
-/*                                                                              */
+/*										*/
+/*	Argument Scanning Methods						*/
+/*										*/
 /********************************************************************************/
 
 private void scanArgs(String [] args)
@@ -171,24 +168,24 @@ private void scanArgs(String [] args)
 	  }
 	 else if (args[i].startsWith("-ws") && i+1 < args.length) {     // -ws <workspace>
 	    work_directory = new File(args[++i]);
-            work_directory = IvyFile.getCanonical(work_directory);
+	    work_directory = IvyFile.getCanonical(work_directory);
 	  }
-         else if (args[i].startsWith("-log") && i+1 < args.length) {     // -log <logfile>
-            LspLog.setLogFile(new File(args[++i]));
-            LspLog.setUseStdErr(false);
-            havelog = true;
-          }
-         else if (args[i].startsWith("-lang") && i+1 < args.length) {
-            LspLog.logD("SET LANGUAGE TO " + args[++i]);
-          }
-         else if (args[i].startsWith("-err")) {                         // -err
-            LspLog.setUseStdErr(true);
-          }
+	 else if (args[i].startsWith("-log") && i+1 < args.length) {     // -log <logfile>
+	    LspLog.setLogFile(new File(args[++i]));
+	    LspLog.setUseStdErr(false);
+	    havelog = true;
+	  }
+	 else if (args[i].startsWith("-lang") && i+1 < args.length) {
+	    LspLog.logD("SET LANGUAGE TO " + args[++i]);
+	  }
+	 else if (args[i].startsWith("-err")) {                         // -err
+	    LspLog.setUseStdErr(true);
+	  }
 	 else badArgs();
        }
       else badArgs();
     }
-   
+
    if (!havelog) {
       File f = new File(work_directory,"lspbase_log.log");
       LspLog.setLogFile(f);
@@ -206,18 +203,18 @@ private void badArgs()
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Access methods                                                          */
-/*                                                                              */
+/*										*/
+/*	Access methods								*/
+/*										*/
 /********************************************************************************/
 
 
-File getWorkSpaceDirectory()			        { return work_directory; }
+File getWorkSpaceDirectory()				{ return work_directory; }
 
-File getRootDirectory()				{ return root_directory; }
+File getRootDirectory() 			{ return root_directory; }
 
-LspBaseProjectManager getProjectManager()               { return project_manager; }
-LspBaseDebugManager getDebugManager()                   { return debug_manager; }
+LspBaseProjectManager getProjectManager()		{ return project_manager; }
+LspBaseDebugManager getDebugManager()			{ return debug_manager; }
 
 
 LspBaseFile getFileData(String proj,String file)
@@ -239,17 +236,18 @@ LspBaseFile getFileData(String proj,File file)
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Processing methods                                                      */
-/*                                                                              */
+/*										*/
+/*	Processing methods							*/
+/*										*/
 /********************************************************************************/
 
-private void start() 
+private void start()
 {
    try {
       project_manager = new LspBaseProjectManager(this);
       debug_manager = new LspBaseDebugManager(this);
-      lsp_monitor = new LspBaseMonitor(this,mint_handle);       
+      lsp_monitor = new LspBaseMonitor(this,mint_handle);
+      debug_manager.start();
     }
    catch (LspBaseException e) {
       LspLog.logE("Problem initializing: " + e,e);
@@ -261,49 +259,49 @@ private void start()
 private void waitForShutDown()
 {
    lsp_monitor.waitForShutDown();
-   
+
    LspLog.logD("Start shutdown");
-   
+
    for (LspBaseProtocol proto : workspace_protocols.values()) {
       proto.shutDown();
     }
-   
+
    LspLog.logD("Exiting");
-   
+
    System.exit(0);
 }
 
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Protocol methods                                                        */
-/*                                                                              */
+/*										*/
+/*	Protocol methods							*/
+/*										*/
 /********************************************************************************/
 
 LspBaseProtocol findProtocol(File ws,String lang,List<LspBasePathSpec> paths)
 {
    LspBaseProtocol proto = null;
-   
+
    synchronized (workspace_protocols) {
       proto = workspace_protocols.get(ws);
       if (proto != null) return proto;
-      
+
       LspBaseLanguageData ld = exec_map.get(lang);
       if (ld == null) return null;
       if (!ld.isSingleWorkspace()) {
-         proto = active_protocols.get(lang);
-         if (proto != null) {
-            proto.addWorkspace(ws,paths);
-            return proto;
-          }
+	 proto = active_protocols.get(lang);
+	 if (proto != null) {
+	    proto.addWorkspace(ws,paths);
+	    return proto;
+	  }
        }
       proto = new LspBaseProtocol(ws,paths,ld);
       if (ld.isSingleWorkspace()) active_protocols.put(lang,proto);
       workspace_protocols.put(ws,proto);
       if (ld.isSingleWorkspace()) proto.initialize();
     }
-   
+
    return proto;
 }
 
@@ -316,9 +314,9 @@ LspBaseLanguageData getLanguageData(String lang)
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Message sending                                                         */
-/*                                                                              */
+/*										*/
+/*	Message sending 							*/
+/*										*/
 /********************************************************************************/
 
 public IvyXmlWriter beginMessage(String typ)
@@ -367,7 +365,7 @@ public void startTask(Runnable r)
 public void startTaskDelayed(Runnable r,long delay)
 {
    if (r == null) return;
-   
+
    LspBaseDelayExecute pde = new LspBaseDelayExecute(r);
    lsp_timer.schedule(pde,delay);
 }
@@ -389,49 +387,49 @@ public void scheduleTask(TimerTask r,long delay,long inter)
 private static class LspBaseThreadPool extends ThreadPoolExecutor implements ThreadFactory {
 
    private static int thread_counter = 0;
-   
+
    LspBaseThreadPool() {
       super(LSPBASE_CORE_POOL_SIZE,LSPBASE_MAX_POOL_SIZE,
-            LSPBASE_POOL_KEEP_ALIVE_TIME,TimeUnit.MILLISECONDS,
-            new LinkedBlockingQueue<Runnable>());
-      
+	    LSPBASE_POOL_KEEP_ALIVE_TIME,TimeUnit.MILLISECONDS,
+	    new LinkedBlockingQueue<Runnable>());
+
       setThreadFactory(this);
     }
-   
+
    @Override public Thread newThread(Runnable r) {
       Thread t = new Thread(r,"LspBaseWorkerThread_" + (++thread_counter));
       t.setDaemon(true);
       return t;
     }
-   
+
    @Override protected void afterExecute(Runnable r,Throwable t) {
       super.afterExecute(r,t);
       if (t != null) {
-         LspLog.logE("Problem with background task " + r.getClass().getName() + " " + r,t);
+	 LspLog.logE("Problem with background task " + r.getClass().getName() + " " + r,t);
        }
     }
-   
+
 }	// end of inner class LspBaseThreadPool
 
 
 private class LspBaseDelayExecute extends TimerTask {
-   
+
    private Runnable run_task;
-   
+
    LspBaseDelayExecute(Runnable r) {
       run_task = r;
     }
-   
+
    @Override public void run() {
       thread_pool.execute(run_task);
     }
-   
+
 }	// end of LspBaseDelayExecute
 
 
 
 
-}       // end of class LspBaseMain
+}	// end of class LspBaseMain
 
 
 

@@ -79,20 +79,178 @@ LspBaseDebugThread(LspBaseDebugTarget tgt,int id)
    cur_breakpoints = null;
 }
 
+
+
 /********************************************************************************/
 /*                                                                              */
 /*      Access methods                                                          */
 /*                                                                              */
 /********************************************************************************/
 
-List<LspBaseDebugStackFrame> getStackFrames()
-{
-   return new ArrayList<>();
-}
-     
 
 String getName()                                { return null; }
 int getId()                                     { return thread_id; }
+
+boolean isStopped()
+{
+   return thread_state == ThreadState.STOPPED;
+}
+
+private LspBaseDebugProtocol getProtocol()
+{
+   return debug_target.getDebugProtocol();
+}
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Stack Frame methods                                                     */
+/*                                                                              */
+/********************************************************************************/
+
+List<LspBaseDebugStackFrame> getStackFrames()
+{
+   LspBaseDebugProtocol proto = getProtocol();
+   JSONObject format = createJson("hex",false,
+         "parameters",true,"parameterTypes",true,
+         "parameterValues",true,"line",true,
+         "module",true,"includeAll",true);
+   StackFramer sf = new StackFramer();
+   proto.sendRequest("stackTrace",sf,
+         "threadId",getId(),"startFrame",0,
+         "levels",0,"format",format);
+   
+   return sf.getFrames();
+}
+
+
+private class StackFramer implements LspResponder {
+   
+   private List<LspBaseDebugStackFrame> cur_frames;
+   
+   StackFramer() {
+      cur_frames = new ArrayList<>();
+    }
+   
+   List<LspBaseDebugStackFrame> getFrames()             { return cur_frames; }
+   
+   @Override public void handleResponse(Object data,JSONObject err) {
+      if (data instanceof JSONObject) {
+         JSONObject body = (JSONObject) data;
+         JSONArray frames = body.getJSONArray("stackFrames");
+         for (int i = 0; i < frames.length(); ++i) {
+            JSONObject frame = frames.getJSONObject(i);
+            LspBaseDebugStackFrame frm = new LspBaseDebugStackFrame(i,frame);
+            cur_frames.add(frm);
+          }
+       }
+    }
+}
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Command handling                                                        */
+/*                                                                              */
+/********************************************************************************/
+
+boolean debugAction(LspBaseDebugAction action,String frameid)
+{
+   LspBaseDebugProtocol proto = debug_target.getDebugProtocol();
+   ActionStatus sts = new ActionStatus();
+   switch (action) {
+      case NONE :
+         break;
+      case SUSPEND :
+         switch (thread_state) {
+            case RUNNING :
+               proto.sendRequest("pause",sts,
+                     "threadId",getId());
+               break;
+          }
+         break;
+      case RESUME :
+         switch (thread_state) {
+            case STOPPED :
+               proto.sendRequest("continue",sts,
+                     "threadId",getId(),"singleThread",true);
+               break;
+          }
+         break;
+      case DROP_TO_FRAME :
+         switch (thread_state) {
+            case STOPPED :
+               proto.sendRequest("restartFrame",sts,
+                     "threadId",getId(),"singleThread",true,
+                     "frameId",Integer.parseInt("frameid"),
+                     "granularity","statement");
+               break;
+          }
+         break;
+      case STEP_INTO :
+         switch (thread_state) {
+            case STOPPED :
+               proto.sendRequest("stepIn",sts,
+                     "threadId",getId(),"singleThread",true,
+                     "granularity","statement");
+               break;
+          }
+         break;
+      case STEP_OVER :
+         switch (thread_state) {
+            case STOPPED :
+               proto.sendRequest("next",sts,
+                     "threadId",getId(),"singleThread",true,
+                     "granularity","statement");
+               break;
+          }
+         break;
+      case STEP_RETURN :
+         switch (thread_state) {
+            case STOPPED :
+               proto.sendRequest("stepOut",sts,
+                     "threadId",getId(),"singleThread",true,
+                     "granularity","statement");
+               break;
+          }
+         break;
+      case TERMINATE :
+         switch (thread_state) {
+            case INIT :
+            case STOPPED :
+            case RUNNING :
+               JSONArray tids = new JSONArray();
+               tids.put(getId());
+               proto.sendRequest("terminateThreads",sts,
+                     "threadIds",tids);
+               break;
+          }
+         break;
+    }
+   
+   return sts.isOkay();
+}
+
+
+
+private class ActionStatus implements LspResponder {
+   
+   private boolean is_error;
+   
+   ActionStatus() {
+      is_error = true;
+    }
+   
+   boolean isOkay()                             { return !is_error; }
+   
+   @Override public void handleResponse(Object data,JSONObject err) {
+      if (err != null) is_error = true;
+      is_error = false;
+    }
+   
+}       // end of inner class ActionStatus
 
 
 
@@ -106,8 +264,10 @@ void setState(String state)
 { 
    switch (state) {
       case "started" :
+         thread_state = ThreadState.RUNNING;
          break;
       case "exited" :
+         thread_state = ThreadState.TERMINATED;
          break;
       default :
          break;

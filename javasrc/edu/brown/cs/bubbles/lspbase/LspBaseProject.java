@@ -157,6 +157,7 @@ LspBaseFile findFile(String path)
        }
       path = path.substring(j);
     }
+   
    return file_map.get(path);
 }
 

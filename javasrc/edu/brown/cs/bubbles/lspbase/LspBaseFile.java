@@ -275,11 +275,15 @@ synchronized void unlockFile()
 
 int mapLspLineToOffset(int line)
 {
+   if (line_offsets == null) setupOffsets();
+   
    return line_offsets.findOffset(line+1);
 }
 
 int mapLineToOffset(int line)
 {
+   if (line_offsets == null) setupOffsets();
+   
    return line_offsets.findOffset(line);
 }
 

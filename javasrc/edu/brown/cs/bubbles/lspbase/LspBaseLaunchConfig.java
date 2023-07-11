@@ -265,8 +265,13 @@ public List<String> getVMArguments()
 public List<String> getToolArguments()
 {
    String s = config_attrs.get(LspBaseConfigAttribute.TOOL_ARGS);
-   if (s == null) return null;
+   String d = config_attrs.get(LspBaseConfigAttribute.DEVICE);
+   if (s == null && d == null) return null;
    List<String> args = IvyExec.tokenize(s);
+   if (d != null) {
+      args.add("-d");
+      args.add(d);
+    }
    if (args.isEmpty()) return null;
    return args;
 }

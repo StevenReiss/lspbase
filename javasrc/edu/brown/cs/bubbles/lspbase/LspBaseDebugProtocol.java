@@ -294,8 +294,6 @@ private void localSendRequest(String method,LspResponder resp,boolean wait,JSONO
 {
    int id = id_counter.getAndIncrement();
    JSONObject jo = new JSONObject();
-// jo.put("jsonrpc","2.0");
-// jo.put("id",id);
    jo.put("seq",id);
    jo.put("type","request");
    jo.put("command",method);
@@ -340,6 +338,46 @@ private void localSendRequest(String method,LspResponder resp,boolean wait,JSONO
 
 
 
+/********************************************************************************/
+/*                                                                              */
+/*      Response sending                                                        */
+/*                                                                              */
+/********************************************************************************/
+
+private void sendResponse(int seq,String cmd,JSONObject resp,String error)
+{
+   JSONObject jo = new JSONObject();
+   jo.put("request_seq",seq);
+   jo.put("success",(error == null));
+   jo.put("type","request");
+   jo.put("command",cmd);
+   if (error != null) jo.put("message",error);
+   if (resp != null) jo.put("body",resp);
+   
+   String cnts = jo.toString();
+   int len = cnts.length();
+   StringBuffer buf = new StringBuffer();
+   buf.append("Content-Length: ");
+   buf.append(len);
+   buf.append("\r\n");
+   buf.append("\r\n");
+   buf.append(cnts);
+   
+   LspLog.logD("DEBUG: Response " + seq + " " + cmd + " " + len + " " + jo.toString(2));
+   
+   synchronized (message_stream) {
+      try{
+	 message_stream.write(buf.toString());
+	 message_stream.flush();
+       }
+      catch (IOException e) {
+	 LspLog.logE("DEBUG: Problem writing response message",e);
+       }
+    }
+}
+
+
+
 
 private void dummyHandler(Object resp,JSONObject err)
 {
@@ -357,7 +395,7 @@ private void dummyHandler(Object resp,JSONObject err)
 
 void processResponse(JSONObject resp)
 {
-   int id = resp.optInt("seq");
+   int id = resp.optInt("request_seq");
    LspResponder lsp = pending_map.get(id);
    LspLog.logD("DEBUG: Reply " + id + " " + (lsp != null) + " " + resp.toString(2));
    
@@ -386,6 +424,27 @@ void processResponse(JSONObject resp)
 }
 
 
+void processRequest(JSONObject req)
+{
+   int seq = req.getInt("seq");
+   String cmd = req.getString("command");
+   JSONObject args = req.optJSONObject("arguments");
+   
+   switch (cmd) {
+      case "runInTerminal" :
+         try {
+            JSONObject resp = debug_target.runInTerminal(args);
+            sendResponse(seq,cmd,resp,null);
+          }
+         catch (LspBaseException e) {
+            sendResponse(seq,cmd,null,e.getMessage());
+          }
+         break;
+    }
+   
+}
+
+
 void processEvent(JSONObject resp)
 { 
    String event = resp.getString("event");
@@ -393,6 +452,10 @@ void processEvent(JSONObject resp)
    JSONObject body = null;
    if (data instanceof JSONObject) body = (JSONObject) data;
 // int id = resp.getInt("seq");
+   int idx = event.indexOf(".");
+   if (idx > 0) { 
+      event = event.substring(idx+1);
+    }
    switch (event) {
       case "initialized" :
          handleInitialized();
@@ -424,9 +487,19 @@ void processEvent(JSONObject resp)
          break;
       case "progressEnd" :
          break;
-      case "progessStart" :
+      case "progressStart" :
          break;
       case "progressUpdated" :
+         break;
+      case "appStart" :
+      case "appStarted" :
+      case "debuggerUris" :
+      case "serviceRegistered" :
+      case "serviceExtensionAdded" :
+      case "serviceExtensionStateChanged" :
+         break;
+      case "log" :
+         LspLog.logI("DEBUG: " + body.getString("message"));
          break;
       default :
          LspLog.logE("DEBUG: Unknown event " + resp.toString(2));
@@ -447,7 +520,7 @@ private class MessageReader extends Thread {
    private BufferedInputStream message_input;
    
    MessageReader(InputStream input) {
-      super("LSP_Message_Reader_ " + client_id);
+      super("LSP_Debug_Message_Reader_" + client_id);
       message_input = new BufferedInputStream(input);
     }
    
@@ -457,6 +530,7 @@ private class MessageReader extends Thread {
          try {
             String ln = readline();
             if (ln == null) break;
+            LspLog.logD("DEBUG: Read line: " + ln);
             if (ln.length() == 0) {
                if (clen > 0) {
                   byte [] buf = new byte[clen];
@@ -483,16 +557,20 @@ private class MessageReader extends Thread {
                 }
              }
           }
-         catch (IOException e) { }
+         catch (IOException e) {
+            LspLog.logE("DEBUG: Problem reading debug message",e);
+          }
        }
+      LspLog.logI("DEBUG: message reader exited");
     }
    
    String readline() throws IOException {
-      byte [] buf = new byte[10000];
+      byte [] buf = new byte[100000];
       int ln = 0;
       int lastb = 0;
       for ( ; ; ) {
          int b = message_input.read();
+         if (b == -1) return null;
          if (b == '\n' && lastb == '\r') break;
          buf[ln++] = (byte) b;
          lastb = b;
@@ -502,23 +580,55 @@ private class MessageReader extends Thread {
     }
    
    void process(JSONObject reply) {
+      MessageProcessor mp = new MessageProcessor(reply);
       String type = reply.getString("type");
+      // might want to not process events if we are processing a response actively?
+      if (type.equals("event")) {
+         // process events asynchronously as they might generate messages
+         LspBaseMain lsp = LspBaseMain.getLspMain();
+         lsp.startTask(mp);
+       }
+      else {
+         // process responses and requests synchronously
+         mp.run();
+       }
+    }
+   
+}	// end of inner class MessageReader
+
+
+
+class MessageProcessor implements Runnable {
+   
+   JSONObject json_message;
+   
+   MessageProcessor(JSONObject msg) {
+      json_message = msg;
+    }
+   
+   @Override public void run() {
+      LspLog.logD("Debug process " + json_message.toString(2));
+      
+      String type = json_message.getString("type");
       switch (type) {
          case "response" :
-            processResponse(reply);
+            processResponse(json_message);
             break;
          case "event" :
-            processEvent(reply);
+            processEvent(json_message);
             break;
          case "request" :
+            processRequest(json_message);
+            break;
          default :
-            LspLog.logE("DEBUG: Unexpected message of type " + type + " " + reply.toString(2));
+            LspLog.logE("DEBUG: Unexpected message of type " + type + " " + json_message.toString(2));
             break;
        }
     }
    
-   
-}	// end of inner class MessageReader
+}
+
+
 
 
 

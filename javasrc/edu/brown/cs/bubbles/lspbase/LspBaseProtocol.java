@@ -681,10 +681,10 @@ private class MessageReader extends Thread {
       int ln = 0;
       int lastb = 0;
       for ( ; ; ) {
-	 int b = message_input.read();
-	 if (b == '\n' && lastb == '\r') break;
-	 buf[ln++] = (byte) b;
-	 lastb = b;
+         int b = message_input.read();
+         if (b == '\n' && lastb == '\r') break;
+         buf[ln++] = (byte) b;
+         lastb = b;
        }
       if (ln > 0 && buf[ln-1] == '\r') --ln;
       return new String(buf,0,ln);
@@ -728,11 +728,11 @@ private class ErrorReader extends Thread {
 
    @Override public void run() {
       try {
-	 for ( ; ; ) {
-	    String l = input_reader.readLine();
-	    if (l == null) break;
-	    LspLog.logE("Protocol error: " + l);
-	  }
+         for ( ; ; ) {
+            String l = input_reader.readLine();
+            if (l == null) break;
+            LspLog.logE("Protocol error: " + l);
+          }
        }
       catch (IOException e) { return; }
     }

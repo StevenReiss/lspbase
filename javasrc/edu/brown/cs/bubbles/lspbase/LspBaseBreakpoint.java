@@ -24,6 +24,7 @@ package edu.brown.cs.bubbles.lspbase;
 
 
 import javax.swing.text.Position;
+import javax.swing.text.Segment;
 
 import org.json.JSONObject;
 import org.w3c.dom.Element;
@@ -322,10 +323,19 @@ private static class LineBreakpoint extends LspBaseBreakpoint
       String fnm = IvyXml.getTextElement(xml,"FILE");
       String pnm = IvyXml.getAttrString(xml,"PROJECT");
       LspBaseProject bp = pm.getProjectManager().findProject(pnm);
+      bp.open();
       file_data = bp.findFile(fnm);
       if (file_data == null) throw new LspBaseException("File " + fnm + " not found");
       int line = IvyXml.getAttrInt(xml,"LINE");
       int off = file_data.mapLineToOffset(line);
+      int off1 = file_data.mapLineToOffset(line+1);
+      Segment s = file_data.getSegment(off,off1-off);
+      for (int i = 0; i < s.length(); ++i) {
+         char c = s.charAt(i);
+         if (Character.isWhitespace(c)) ++off;
+         else break;
+       }
+      
       file_position = file_data.createPosition(off);
     }
    
