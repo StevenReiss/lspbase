@@ -371,6 +371,18 @@ void getStackFrames(int tid,int count,int depth,int arrsz,IvyXmlWriter xw)
 /*										*/
 /********************************************************************************/
 
+void getVariableValue(String tid,String fid,String var,int saveid,int depth,int arr,IvyXmlWriter xw)
+{
+   for (LspBaseDebugThread thrd : thread_data.values()) {
+      if (matchThread(tid,thrd)) {
+         thrd.getVariableValue(fid,var,saveid,depth,arr,xw);
+         break;
+       }
+    }
+}
+
+
+
 void evaluateExpression(String bid,String eid,String expr,int frame,boolean stop)
 { }
 

@@ -125,11 +125,11 @@ List<LspBaseDebugStackFrame> getStackFrames()
          "threadId",getId(),"startFrame",0,
          "levels",0,"format",format);
    
-   // for each frame, do a scope command followed by variabless
+   // for each frame, do a scope command followed by variables
    for (LspBaseDebugStackFrame frm : sf.getFrames()) {
       if (frm.getBaseFile() != null) {
          proto.sendRequest("scopes",new FrameScoper(frm),
-               "frameid",frm.getId());
+               "frameId",frm.getId());
          frm.loadVariables(1);
        }
     }
@@ -262,6 +262,43 @@ boolean debugAction(LspBaseDebugAction action,String frameid)
    
    return sts.isOkay();
 }
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Handle Evaluations                                                      */
+/*                                                                              */
+/********************************************************************************/
+
+void getVariableValue(String fid,String var,int saveid,int depth,int arr,IvyXmlWriter xw)
+{
+   LspBaseDebugProtocol proto = debug_target.getDebugProtocol();
+   
+   // need to find variable to get proper frame? 
+ 
+   proto.sendRequest("variables",new VariableLoader(),
+         "variableReference",saveid);
+}
+
+
+private class VariableLoader implements LspResponder {
+
+   VariableLoader() {
+      
+    }
+   
+   @Override public void handleResponse(Object data,JSONObject err) {
+      JSONObject body = (JSONObject) data;
+      JSONArray vars = body.getJSONArray("variables");
+      // here we should use the code for Variable Data with the current
+      // value being the stack frame
+      // xw.begin("VALUE");
+      // output values
+      // xw.end("VALUE");
+    }
+}
+
 
 
 

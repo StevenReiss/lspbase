@@ -25,6 +25,7 @@ package edu.brown.cs.bubbles.lspbase;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -50,8 +51,12 @@ private LspBaseFile base_file;
 private int     frame_line;
 private int     frame_column;
 private boolean is_synthetic;
-private List<ScopeData> frame_scopes;
-private List<VariableData> frame_variables;
+private List<LspBaseDebugScope> frame_scopes;
+private List<LspBaseDebugVariable> frame_variables;
+private Set<String> local_scopes;
+private Set<String> class_scopes;
+private Set<String> primitive_types;
+private Set<String> string_types;
 
 
 
@@ -72,7 +77,7 @@ LspBaseDebugStackFrame(LspBaseDebugThread thrd,int idx,JSONObject sfobj)
    base_file = null;
    JSONObject src = sfobj.optJSONObject("source");
    if (src != null) {
-      String path = sfobj.optString("path",null);
+      String path = src.optString("path",null);
       if (path != null) {
          frame_file = new File(path);
          base_file = LspBaseMain.getLspMain().getProjectManager().findFile(null,path);
@@ -86,9 +91,13 @@ LspBaseDebugStackFrame(LspBaseDebugThread thrd,int idx,JSONObject sfobj)
    String hint = sfobj.optString("presentationHint","normal");
    if (hint.equals("label")) is_synthetic = true;
    
-   // need to get variables
+   LspBaseDebugProtocol proto = for_thread.getProtocol();
+   LspBaseLanguageData ld = proto.getLanguage();
+   local_scopes = ld.getCapabilitySet("localScopes");
+   class_scopes = ld.getCapabilitySet("classScopes");
+   primitive_types = ld.getCapabilitySet("primitiveTypes");
+   string_types = ld.getCapabilitySet("stringTypes");
 }
-
 
 
 
@@ -101,6 +110,35 @@ LspBaseDebugStackFrame(LspBaseDebugThread thrd,int idx,JSONObject sfobj)
 int getIndex()                  { return frame_index; }
 LspBaseFile getBaseFile()       { return base_file; }
 int getId()                     { return frame_id; }
+
+boolean isLocalScope(String scptyp)
+{
+   if (local_scopes == null) return true;
+   return local_scopes.contains(scptyp);
+}
+
+
+boolean isStaticScope(String scptyp)
+{
+   if (class_scopes == null) return true;
+   if (class_scopes.contains(scptyp)) return false;
+   return true;
+}
+
+
+boolean isPrimitiveType(String typ) 
+{
+   if (primitive_types == null || primitive_types.contains(typ)) return true;
+   return false;
+}
+
+
+boolean isStringType(String typ) 
+{
+   if (string_types == null) return false;
+   if (string_types.contains(typ)) return true;
+   return false;
+}
 
 
 
@@ -115,7 +153,7 @@ void addScopes(JSONArray scopes)
    frame_scopes = new ArrayList<>();
    for (int i = 0; i < scopes.length(); ++i) {
       JSONObject scp = scopes.getJSONObject(i);
-      ScopeData sd = new ScopeData(scp);
+      LspBaseDebugScope sd = new LspBaseDebugScope(this,scp);
       frame_scopes.add(sd);
     }
 }
@@ -126,12 +164,20 @@ void loadVariables(int depth)
 {
    if (frame_scopes == null) return;
    
+   frame_variables = new ArrayList<>();
+   
    LspBaseDebugProtocol proto = for_thread.getProtocol();
    
-   frame_variables = new ArrayList<>();
-   for (ScopeData sd : frame_scopes) {
-      proto.sendRequest("variables",new VariableLoader(sd),
-            ",Reference",sd.getReferenceNumber());
+   for (LspBaseDebugScope sd : frame_scopes) {
+      String dnm = sd.getDelayName();
+      if (dnm != null) {
+         LspBaseDebugVariable vd = new LspBaseDebugVariable(dnm,sd);
+         frame_variables.add(vd);
+       }
+      else {
+         proto.sendRequest("variables",new VariableLoader(sd),
+               "variablesReference",sd.getReferenceNumber());
+       }
     }
 }
 
@@ -139,10 +185,10 @@ void loadVariables(int depth)
 
 private class VariableLoader implements LspResponder {
    
-   private ScopeData for_scope;
+   private LspBaseDebugScope scope_data;
    
-   VariableLoader(ScopeData sd) {
-      for_scope = sd;
+   VariableLoader(LspBaseDebugScope sd) { 
+      scope_data = sd;
     }
    
    @Override public void handleResponse(Object data,JSONObject err) {
@@ -150,7 +196,7 @@ private class VariableLoader implements LspResponder {
       JSONArray vars = body.getJSONArray("variables");
       for (int i = 0; i < vars.length(); ++i) {
          JSONObject var = vars.getJSONObject(i);
-         VariableData vd = new VariableData(var);
+         LspBaseDebugVariable vd = new LspBaseDebugVariable(var,scope_data);
          frame_variables.add(vd);
        }
     
@@ -168,49 +214,24 @@ void outputXml(IvyXmlWriter xw,int ctr,int depth)
 {
    xw.begin("STACKFRAME");
    xw.field("LEVEL",frame_index);
-   xw.field("NAME",frame_method);
+   xw.field("METHOD",frame_method);
    xw.field("ID",frame_id);
    xw.field("LINENO",frame_line);
    xw.field("COLNO",frame_column);
    if (frame_file != null) xw.field("FILE",frame_file.getPath());
-   else xw.field("SYSTEM",true);
+   if (base_file != null) xw.field("FILETYPE","SOURCEFILE");
+   else xw.field("FILETYPE","CLASSFILE");
    if (is_synthetic) xw.field("SYNTHETIC",true);
-   // output variables
+  
+   if (frame_variables != null) {
+      for (LspBaseDebugVariable bd : frame_variables) {
+         bd.outputValue(xw);
+       }
+    }
    
    xw.end("STACKFRAME");
 }
 
-
-
-/********************************************************************************/
-/*                                                                              */
-/*      Scope information                                                       */
-/*                                                                              */
-/********************************************************************************/
-
-private class ScopeData {
-   
-   private JSONObject scope_data;
-   
-   ScopeData(JSONObject obj) {
-      scope_data = obj;
-    }
-   
-   int getReferenceNumber()             { return scope_data.getInt("variablesReference"); }
-   
-}       // end of inner class ScopeData
-
-
-
-private class VariableData {
-   
-   private JSONObject var_data;
-   
-   VariableData(JSONObject obj) {
-      var_data = obj;
-    }
-   
-}       // end of inner class VariableData
 
 
 }       // end of class LspBaseDebugStackFrame

@@ -195,14 +195,22 @@ void handleCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
                IvyXml.getAttrInt(xml,"ARRAY",100),xw);
          break;
       case "VARVAL" :
-         getVariableValue(IvyXml.getAttrString(xml,"FRAME"),
+         getVariableValue(IvyXml.getAttrString(xml,"THREAD"),
+               IvyXml.getAttrString(xml,"FRAME"),
                IvyXml.getTextElement(xml,"VAR"),
-               IvyXml.getAttrInt(xml,"DEPTH",1),xw);
+               IvyXml.getAttrInt(xml,"SAVEID",0),
+               IvyXml.getAttrInt(xml,"DEPTH",1),
+               IvyXml.getAttrInt(xml,"ARRAY",100),xw);
          break;
       case "VARDETAIL" :
-         getVariableValue(IvyXml.getAttrString(xml,"FRAME"),
-               IvyXml.getTextElement(xml,"VAR"),-1,xw);
+         getVariableValue(IvyXml.getAttrString(xml,"THREAD"),
+               IvyXml.getAttrString(xml,"FRAME"),
+               IvyXml.getTextElement(xml,"VAR"),
+               IvyXml.getAttrInt(xml,"SAVEID",0),
+               IvyXml.getAttrInt(xml,"DEPTH",1),
+               IvyXml.getAttrInt(xml,"ARRAY",100),xw);
          break;
+            
       case "EVALUATE" :
          evaluateExpression(proj,
                IvyXml.getAttrString(xml,"BID","*"),
@@ -806,9 +814,7 @@ void debugAction(String launchid,String targetid,
    for (LspBaseDebugTarget tgt : target_map.values()) {
       if (!matchLaunch(launchid,tgt)) continue;
       if (!matchLaunch(targetid,tgt)) continue;
-      if (threadid == null) {
-         tgt.debugAction(action,threadid,frameid,xw);
-       }
+      tgt.debugAction(action,threadid,frameid,xw);
     }
 }
 
@@ -856,8 +862,11 @@ void getStackFrames(String launchid,int tid,int count,int depth,int arrsz,IvyXml
 }
 
 
-void getVariableValue(String frame,String var,int depth,IvyXmlWriter xw)
+void getVariableValue(String thread,String frame,String var,int saveid,int depth,int arr,IvyXmlWriter xw)
 {
+   for (LspBaseDebugTarget tgt : target_map.values()) {
+      tgt.getVariableValue(thread,frame,var,saveid,depth,arr,xw);
+    }
    
 }
 

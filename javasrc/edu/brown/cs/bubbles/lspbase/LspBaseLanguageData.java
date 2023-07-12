@@ -133,11 +133,31 @@ Object getCapability(String key)
 }
 
 
-JSONObject getCapabilityJson(String key)
+JSONArray getCapabilityArray(String key)
 {
    Object cap = getCapability(key);
-   if (cap == null || !(cap instanceof JSONObject)) return null;
-   return (JSONObject) cap;
+   if (cap == null || !(cap instanceof JSONArray)) return null;
+   return (JSONArray) cap;
+}
+
+
+Set<String> getCapabilitySet(String key)
+{
+   Set<String> rslt = new HashSet<>();
+   
+   Object cap = getCapability(key);
+   if (cap == null) return rslt;
+   else if (cap instanceof JSONArray) {
+      JSONArray arr = (JSONArray) cap;
+      for (int i = 0; i < arr.length(); ++i) {
+         rslt.add(arr.get(i).toString());
+       }
+    }
+   else {
+      rslt.add(cap.toString());
+    }
+   
+   return rslt;
 }
 
 

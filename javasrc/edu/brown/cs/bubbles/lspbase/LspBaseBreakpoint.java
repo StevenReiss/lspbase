@@ -360,11 +360,13 @@ private static class LineBreakpoint extends LspBaseBreakpoint
    
    @Override void setProtoInfo(JSONObject data) {
       super.setProtoInfo(data);
-      int line = data.getInt("line");
-      int col = data.optInt("column",1);
-      int off = file_data.mapLineCharToOffset(line,col);
-      if (off != file_position.getOffset()) {
-         file_position = file_data.createPosition(off);
+      int line = data.optInt("line",-1);
+      if (line > 0) {
+         int col = data.optInt("column",1);
+         int off = file_data.mapLineCharToOffset(line,col);
+         if (off != file_position.getOffset()) {
+            file_position = file_data.createPosition(off);
+          }
        }
     }
    
