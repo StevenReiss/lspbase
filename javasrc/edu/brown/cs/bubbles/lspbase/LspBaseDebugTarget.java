@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json.JSONArray;
@@ -63,6 +64,12 @@ private boolean                 use_flutter;
 private ProcessData		process_data;
 private Map<Integer,LspBaseDebugThread> thread_data;
 
+private Set<String> local_scopes;
+private Set<String> class_scopes;
+private Set<String> primitive_types;
+private Set<String> string_types;
+
+
 private static AtomicInteger	pid_counter = new AtomicInteger(1000000);
 
 
@@ -87,6 +94,11 @@ LspBaseDebugTarget(LspBaseDebugManager mgr,LspBaseLaunchConfig config)
    launch_pid = pid_counter.getAndIncrement();
    
    debug_protocol = debug_manager.getDebugProtocol(this);
+   LspBaseLanguageData ld = debug_protocol.getLanguage();
+   local_scopes = ld.getCapabilitySet("localScopes");
+   class_scopes = ld.getCapabilitySet("classScopes");
+   primitive_types = ld.getCapabilitySet("primitiveTypes");
+   string_types = ld.getCapabilitySet("stringTypes");
 }
 
 
@@ -142,6 +154,38 @@ LspBaseDebugProtocol getDebugProtocol()
 {
    return debug_protocol;
 }
+
+
+
+boolean isLocalScope(String scptyp)
+{
+   if (local_scopes == null) return true;
+   return local_scopes.contains(scptyp);
+}
+
+
+boolean isStaticScope(String scptyp)
+{
+   if (class_scopes == null) return true;
+   if (class_scopes.contains(scptyp)) return false;
+   return true;
+}
+
+
+boolean isPrimitiveType(String typ) 
+{
+   if (primitive_types == null || primitive_types.contains(typ)) return true;
+   return false;
+}
+
+
+boolean isStringType(String typ) 
+{
+   if (string_types == null) return false;
+   if (string_types.contains(typ)) return true;
+   return false;
+}
+
 
 
 /********************************************************************************/
@@ -371,11 +415,12 @@ void getStackFrames(int tid,int count,int depth,int arrsz,IvyXmlWriter xw)
 /*										*/
 /********************************************************************************/
 
-void getVariableValue(String tid,String fid,String var,int saveid,int depth,int arr,IvyXmlWriter xw)
+void getVariableValue(String tid,String fid,String var,int saveid,int depth,int arr,
+      boolean detail,IvyXmlWriter xw)
 {
    for (LspBaseDebugThread thrd : thread_data.values()) {
       if (matchThread(tid,thrd)) {
-         thrd.getVariableValue(fid,var,saveid,depth,arr,xw);
+         thrd.getVariableValue(fid,var,saveid,depth,arr,detail,xw);
          break;
        }
     }
@@ -383,8 +428,7 @@ void getVariableValue(String tid,String fid,String var,int saveid,int depth,int 
 
 
 
-void evaluateExpression(String bid,String eid,String expr,int frame,boolean stop)
-{ }
+
 
 
 

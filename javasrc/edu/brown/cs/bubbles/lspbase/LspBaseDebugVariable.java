@@ -1,8 +1,8 @@
 /********************************************************************************/
 /*                                                                              */
-/*              LspBaseDebugScope.java                                          */
+/*              LspBaseDebugVariable.java                                       */
 /*                                                                              */
-/*      Representation of a scope for debugging                                 */
+/*      Holder of a variable/value                                              */
 /*                                                                              */
 /********************************************************************************/
 /*      Copyright 2011 Brown University -- Steven P. Reiss                    */
@@ -37,7 +37,9 @@ package edu.brown.cs.bubbles.lspbase;
 
 import org.json.JSONObject;
 
-class LspBaseDebugScope implements LspBaseConstants
+import edu.brown.cs.ivy.xml.IvyXmlWriter;
+
+class LspBaseDebugVariable implements LspBaseConstants
 {
 
 
@@ -47,8 +49,12 @@ class LspBaseDebugScope implements LspBaseConstants
 /*                                                                              */
 /********************************************************************************/
 
+private JSONObject var_data;
+private String var_name;
+private int var_reference;
 private LspBaseDebugThread for_thread;
-private JSONObject scope_data;
+private boolean is_local;
+private boolean is_static;
 
 
 
@@ -58,11 +64,30 @@ private JSONObject scope_data;
 /*                                                                              */
 /********************************************************************************/
 
-LspBaseDebugScope(LspBaseDebugStackFrame frm,JSONObject obj) {
-   scope_data = obj;
-   for_thread = frm.getThread();
+LspBaseDebugVariable(JSONObject obj,LspBaseDebugScope scp) {
+   var_data = obj;
+   for_thread = scp.getThread();
+   is_local = scp.isLocal();
+   is_static = scp.isStatic();
 }
 
+LspBaseDebugVariable(String name,LspBaseDebugScope scp) {
+   var_data = null;
+   for_thread = scp.getThread();
+   var_name = name;
+   var_reference = scp.getReferenceNumber();
+   is_local = false;
+   is_static = scp.isStatic();
+}
+
+
+LspBaseDebugVariable(JSONObject var,LspBaseDebugThread thrd)
+{
+   var_data = var;
+   for_thread = thrd;
+   is_local = false;
+   is_static = false;
+}
 
 
 /********************************************************************************/
@@ -71,50 +96,73 @@ LspBaseDebugScope(LspBaseDebugStackFrame frm,JSONObject obj) {
 /*                                                                              */
 /********************************************************************************/
 
+int getReference()
+{
+   return var_reference;
+}
+
+
 LspBaseDebugThread getThread()                  { return for_thread; }
 
-int getReferenceNumber()             
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Output methods                                                          */
+/*                                                                              */
+/********************************************************************************/
+
+void outputValue(IvyXmlWriter xw) 
 {
-   return scope_data.getInt("variablesReference"); 
+   xw.begin("VALUE");
+   if (var_data == null) {
+      xw.field("HASVARS",true);
+      xw.field("KIND","SCOPE");
+      xw.field("NAME",var_name);
+      xw.field("SAVEID",var_reference);
+      xw.field("STATIC",true);
+    }
+   else {
+      xw.field("NAME",var_data.getString("name"));
+      String typ = var_data.optString("type",null);
+      if (typ != null) xw.field("TYPE",typ);
+      String ename = var_data.optString("evaluateName",null);
+      if (ename != null) xw.field("EVAL",ename);
+      int vref = var_data.getInt("variablesReference");
+      if (vref > 0) xw.field("SAVEID",var_data.getInt("variablesReference"));
+      int nvar = var_data.optInt("namedVariables",0);
+      int nidx = var_data.optInt("indexedVariables",0);
+      if (nvar+nidx > 0) xw.field("HASVARS",true);
+      if (nidx > 0) xw.field("LENGTH",nidx);
+      if (typ == null) {
+         if (nidx > 0) xw.field("KIND","ARRAY");
+         else if (nvar > 0 || vref > 0) xw.field("KIND","OBJECT");
+         else xw.field("KIND","PRIMITIVE");
+       }
+      else if (for_thread.getTarget().isPrimitiveType(typ)) {
+         xw.field("KIND","PRIMITIVE");
+       }
+      else if (for_thread.getTarget().isStringType(typ)) {
+         xw.field("KIND","STRING");
+       }
+      else {
+         xw.field("KIND","OBJECT");
+       }
+      xw.field("LOCAL",is_local);
+      xw.field("STATIC",is_static);
+      xw.cdataElement("DESCRIPTION",var_data.getString("value")); 
+    }
+   
+   xw.end("VALUE");
 }
 
-String getDelayName()
-{
-   String s = scope_data.getString("name");
-   if (for_thread.getTarget().isLocalScope(s)) return null;
-   String name = "< " + s + " >";
-   return name;
-}
-
-boolean isLocal() 
-{
-   String s = scope_data.getString("name");
-   return for_thread.getTarget().isLocalScope(s);
-}
-
-boolean isStatic()
-{
-   String s = scope_data.getString("name");
-   return for_thread.getTarget().isStaticScope(s);
-}
 
 
-boolean isPrimitiveType(String typ)
-{
-   return for_thread.getTarget().isPrimitiveType(typ);
-}
-
-
-boolean isStringType(String typ)
-{
-   return for_thread.getTarget().isStringType(typ);
-}
-
-
-}       // end of class LspBaseDebugScope
+}       // end of class LspBaseDebugVariable
 
 
 
 
-/* end of LspBaseDebugScope.java */
+/* end of LspBaseDebugVariable.java */
 

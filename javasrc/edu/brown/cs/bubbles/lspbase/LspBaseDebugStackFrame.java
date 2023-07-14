@@ -25,7 +25,6 @@ package edu.brown.cs.bubbles.lspbase;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -53,10 +52,6 @@ private int     frame_column;
 private boolean is_synthetic;
 private List<LspBaseDebugScope> frame_scopes;
 private List<LspBaseDebugVariable> frame_variables;
-private Set<String> local_scopes;
-private Set<String> class_scopes;
-private Set<String> primitive_types;
-private Set<String> string_types;
 
 
 
@@ -90,13 +85,6 @@ LspBaseDebugStackFrame(LspBaseDebugThread thrd,int idx,JSONObject sfobj)
    is_synthetic = false;
    String hint = sfobj.optString("presentationHint","normal");
    if (hint.equals("label")) is_synthetic = true;
-   
-   LspBaseDebugProtocol proto = for_thread.getProtocol();
-   LspBaseLanguageData ld = proto.getLanguage();
-   local_scopes = ld.getCapabilitySet("localScopes");
-   class_scopes = ld.getCapabilitySet("classScopes");
-   primitive_types = ld.getCapabilitySet("primitiveTypes");
-   string_types = ld.getCapabilitySet("stringTypes");
 }
 
 
@@ -108,36 +96,50 @@ LspBaseDebugStackFrame(LspBaseDebugThread thrd,int idx,JSONObject sfobj)
 /********************************************************************************/
 
 int getIndex()                  { return frame_index; }
+
+LspBaseDebugThread getThread()  { return for_thread; }
 LspBaseFile getBaseFile()       { return base_file; }
 int getId()                     { return frame_id; }
 
-boolean isLocalScope(String scptyp)
-{
-   if (local_scopes == null) return true;
-   return local_scopes.contains(scptyp);
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Evaluation methods                                                      */
+/*                                                                              */
+/********************************************************************************/
+
+void evaluateExpression(String bid,String eid,String expr,int frame,boolean stop,
+      IvyXmlWriter xw)
+{ 
+   LspBaseDebugProtocol proto = for_thread.getProtocol();
+   EvalHandler eh = new EvalHandler();
+   
+   proto.sendRequest("evaluate",eh,
+         "expression",expr,"frameId",getId(),
+         "context","varaiables");
+   
+   JSONObject rslt = eh.getResult();
+   LspLog.logD("Evaluation result " + rslt);
+   LspBaseDebugVariable var = new LspBaseDebugVariable(rslt,getThread());
+   var.outputValue(xw);
 }
 
 
-boolean isStaticScope(String scptyp)
-{
-   if (class_scopes == null) return true;
-   if (class_scopes.contains(scptyp)) return false;
-   return true;
-}
 
-
-boolean isPrimitiveType(String typ) 
-{
-   if (primitive_types == null || primitive_types.contains(typ)) return true;
-   return false;
-}
-
-
-boolean isStringType(String typ) 
-{
-   if (string_types == null) return false;
-   if (string_types.contains(typ)) return true;
-   return false;
+private class EvalHandler implements LspResponder {
+   
+   private JSONObject eval_result;
+   
+   EvalHandler() {
+      eval_result = null;
+    }
+   
+   JSONObject getResult()               { return eval_result; }
+   
+   @Override public void handleResponse(Object resp,JSONObject err) {
+      eval_result = (JSONObject) resp;
+    }
 }
 
 

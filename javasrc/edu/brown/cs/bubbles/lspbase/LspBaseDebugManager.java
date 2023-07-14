@@ -200,7 +200,7 @@ void handleCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
                IvyXml.getTextElement(xml,"VAR"),
                IvyXml.getAttrInt(xml,"SAVEID",0),
                IvyXml.getAttrInt(xml,"DEPTH",1),
-               IvyXml.getAttrInt(xml,"ARRAY",100),xw);
+               IvyXml.getAttrInt(xml,"ARRAY",100),false,xw);
          break;
       case "VARDETAIL" :
          getVariableValue(IvyXml.getAttrString(xml,"THREAD"),
@@ -208,7 +208,7 @@ void handleCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
                IvyXml.getTextElement(xml,"VAR"),
                IvyXml.getAttrInt(xml,"SAVEID",0),
                IvyXml.getAttrInt(xml,"DEPTH",1),
-               IvyXml.getAttrInt(xml,"ARRAY",100),xw);
+               IvyXml.getAttrInt(xml,"ARRAY",100),true,xw);
          break;
             
       case "EVALUATE" :
@@ -862,10 +862,12 @@ void getStackFrames(String launchid,int tid,int count,int depth,int arrsz,IvyXml
 }
 
 
-void getVariableValue(String thread,String frame,String var,int saveid,int depth,int arr,IvyXmlWriter xw)
+void getVariableValue(String thread,String frame,String var,int saveid,int depth,int arr,
+      boolean detail,IvyXmlWriter xw)
 {
    for (LspBaseDebugTarget tgt : target_map.values()) {
-      tgt.getVariableValue(thread,frame,var,saveid,depth,arr,xw);
+      tgt.getVariableValue(thread,frame,var,saveid,depth,arr,
+            detail,xw);
     }
    
 }
@@ -882,13 +884,15 @@ void evaluateExpression(String proj,String bid,String expr,int thread,
       fidx = Integer.parseInt(frame);
     }
    
+   // need to do this in background if eid is not null
+   
    for (LspBaseDebugTarget tgt : target_map.values()) {
       LspBaseDebugThread thrd = tgt.findThreadById(thread);
       if (thrd != null) {
 	 for (LspBaseDebugStackFrame frm : thrd.getStackFrames()) {
 	    if (frm == null) continue;
 	    if (fidx < 0 || fidx == frm.getIndex()) {
-	       tgt.evaluateExpression(bid,eid,expr,frm.getIndex(),stop);
+	       frm.evaluateExpression(bid,eid,expr,frm.getIndex(),stop,xw);
 	       done = true;
 	       break;
 	     }

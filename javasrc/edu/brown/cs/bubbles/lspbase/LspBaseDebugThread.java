@@ -94,6 +94,7 @@ LspBaseDebugThread(LspBaseDebugTarget tgt,int id,boolean first)
 
 String getName()                                { return thread_name; }
 int getId()                                     { return thread_id; }
+LspBaseDebugTarget getTarget()                  { return debug_target; }
 
 boolean isStopped()
 {
@@ -271,33 +272,55 @@ boolean debugAction(LspBaseDebugAction action,String frameid)
 /*                                                                              */
 /********************************************************************************/
 
-void getVariableValue(String fid,String var,int saveid,int depth,int arr,IvyXmlWriter xw)
+void getVariableValue(String fid,String var,int saveid,int depth,int arr,
+      boolean detail,IvyXmlWriter xw)
 {
    LspBaseDebugProtocol proto = debug_target.getDebugProtocol();
    
-   // need to find variable to get proper frame? 
- 
-   proto.sendRequest("variables",new VariableLoader(),
-         "variableReference",saveid);
+   xw.begin("VALUE");
+   if (detail) {
+      // only want DESCRIPTION FIELD
+    }
+   else {
+      VariableLoader vl = new VariableLoader();
+      proto.sendRequest("variables",vl,
+            "variableReference",saveid);
+      
+      JSONArray vars = vl.getVariables();
+      
+      for (int i = 0; i < vars.length(); ++i) {
+         JSONObject va = vars.getJSONObject(i);
+         LspBaseDebugVariable vd = new LspBaseDebugVariable(va,this);
+         vd.outputValue(xw);
+       }
+    }
+   xw.end("VALUE");
+   
+   // here we should use the code for Variable Data with the current
+   // value being the stack frame
+   // xw.begin("VALUE");
+   // output values
+   // xw.end("VALUE");
+   
 }
 
 
 private class VariableLoader implements LspResponder {
 
+   private JSONArray variable_set;
+   
    VariableLoader() {
-      
+      variable_set = null;
     }
+   
+   JSONArray getVariables()             { return variable_set; }
    
    @Override public void handleResponse(Object data,JSONObject err) {
       JSONObject body = (JSONObject) data;
-      JSONArray vars = body.getJSONArray("variables");
-      // here we should use the code for Variable Data with the current
-      // value being the stack frame
-      // xw.begin("VALUE");
-      // output values
-      // xw.end("VALUE");
+      variable_set = body.getJSONArray("variables");
     }
-}
+   
+}       // end of inner class VariableLoader
 
 
 
