@@ -219,7 +219,11 @@ void handleCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
                IvyXml.getAttrString(xml,"FRAME"),
                IvyXml.getAttrBool(xml,"IMPLICIT",false),
                IvyXml.getAttrBool(xml,"BREAK",true),
-               IvyXml.getAttrString(xml,"REPLYID"),xw);
+               IvyXml.getAttrString(xml,"REPLYID"),
+               IvyXml.getAttrInt(xml,"LEVEL"),
+               IvyXml.getAttrInt(xml,"ARRAY",100),
+               IvyXml.getAttrString(xml,"SAVEID"),
+               IvyXml.getAttrBool(xml,"ALLFRAMES"),xw);
          break;
       default :
 	 throw new LspBaseException("Unknown LSPBASE debug command " + cmd);   
@@ -244,7 +248,12 @@ LspBaseDebugProtocol getDebugProtocol(LspBaseDebugTarget tgt)
          if (ldp == null) {
             ldp = new LspBaseDebugProtocol(this,tgt,ld);
             debug_protocols.put(tgt,ldp);
-            ldp.initialize();
+            try {
+               ldp.initialize();
+             }
+            catch (LspBaseException e) {
+               LspLog.logE("DEBUG: problem initializig protocol",e);
+             }
           }
        }
     }
@@ -545,7 +554,12 @@ void clearLineBreakpoints(String proj,String file,int line)
     }
    if (!updates.isEmpty()) {
       for (LspBaseFile lbf : updates) {
-         updateBreakpointsForFile(lbf);
+         try {
+            updateBreakpointsForFile(lbf);
+          }
+         catch (LspBaseException e) {
+            LspLog.logE("DEBUG problem clearing breakpoints",e);
+          }
        }
       saveBreakpoints();
     }
@@ -642,6 +656,7 @@ private void handleBreakNotify(LspBaseBreakpoint pb,String reason)
 
 
 void updateAllBreakpoints(LspBaseDebugProtocol proto)
+      throws LspBaseException
 {
    Set<LspBaseFile> files = new HashSet<>();
    for (LspBaseBreakpoint pb : break_map.values()) {
@@ -660,7 +675,7 @@ void updateAllBreakpoints(LspBaseDebugProtocol proto)
 }
 
 
-private void updateBreakpointsForFile(LspBaseFile lbf)
+private void updateBreakpointsForFile(LspBaseFile lbf) throws LspBaseException
 {
    JSONObject src = createJson("path",lbf.getFile().getPath());
    JSONArray bpts = new JSONArray();
@@ -695,6 +710,7 @@ private void updateBreakpointsForFile(LspBaseFile lbf)
 
 
 private void updateExceptionBreakpoints(LspBaseProject proj)
+      throws LspBaseException
 {
    for (LspBaseDebugProtocol proto : debug_protocols.values()) {
       if (proj == null || proj.getLanguageData() == proto.getLanguage()) {
@@ -705,6 +721,7 @@ private void updateExceptionBreakpoints(LspBaseProject proj)
 
 
 private void updateExceptionBreakpoints(LspBaseDebugProtocol proto) 
+      throws LspBaseException
 {
    JSONArray filters = new JSONArray();
    JSONArray exceptopts = new JSONArray();
@@ -753,7 +770,7 @@ private void updateExceptionBreakpoints(LspBaseDebugProtocol proto)
 
 
 
-private class BreakpointsSet implements LspResponder {
+private class BreakpointsSet implements LspJsonResponder {
    
    private List<LspBaseBreakpoint> break_points;
    
@@ -761,8 +778,7 @@ private class BreakpointsSet implements LspResponder {
       break_points = bpts;
     }
    
-   @Override public void handleResponse(Object resp,JSONObject err) {
-      JSONObject data = (JSONObject) resp;
+   @Override public void handleResponse(JSONObject data) {
       JSONArray bpts = data.optJSONArray("breakpoints");
       if (bpts != null) {
          for (int i = 0; i < break_points.size(); ++i) {
@@ -864,6 +880,7 @@ void getStackFrames(String launchid,int tid,int count,int depth,int arrsz,IvyXml
 
 void getVariableValue(String thread,String frame,String var,int saveid,int depth,int arr,
       boolean detail,IvyXmlWriter xw)
+      throws LspBaseException
 {
    for (LspBaseDebugTarget tgt : target_map.values()) {
       tgt.getVariableValue(thread,frame,var,saveid,depth,arr,
@@ -875,6 +892,7 @@ void getVariableValue(String thread,String frame,String var,int saveid,int depth
 
 void evaluateExpression(String proj,String bid,String expr,int thread,
       String frame,boolean implicit,boolean stop,String eid,
+      int lvl,int arr,String saveid,boolean allframes,
       IvyXmlWriter xw)
    throws LspBaseException
 {
@@ -892,9 +910,12 @@ void evaluateExpression(String proj,String bid,String expr,int thread,
 	 for (LspBaseDebugStackFrame frm : thrd.getStackFrames()) {
 	    if (frm == null) continue;
 	    if (fidx < 0 || fidx == frm.getIndex()) {
-	       frm.evaluateExpression(bid,eid,expr,frm.getIndex(),stop,xw);
-	       done = true;
-	       break;
+               LspBaseMain lsp = LspBaseMain.getLspMain();
+               IvyXmlWriter msg  = lsp.beginMessage("EVALUATION",bid);
+               msg.field("ID",eid);
+               ExprEvaluator ee = new ExprEvaluator(frm,expr,msg);
+               lsp.startTask(ee);
+	       return;
 	     }
 	  }
        }
@@ -903,6 +924,34 @@ void evaluateExpression(String proj,String bid,String expr,int thread,
    
    if (!done) throw new LspBaseException("No evaluation to do");
 }
+
+
+private class ExprEvaluator implements Runnable {
+
+   LspBaseDebugStackFrame for_frame;
+   String eval_expr;
+   IvyXmlWriter xml_writer;
+   
+   ExprEvaluator(LspBaseDebugStackFrame frm,String expr,IvyXmlWriter msg) {
+      for_frame = frm;
+      eval_expr = expr;
+      xml_writer = msg;
+    }
+   
+   @Override public void run() {
+      LspBaseMain lsp = LspBaseMain.getLspMain();
+      try {
+         LspBaseDebugVariable rslt = for_frame.evaluateExpression(eval_expr);
+         xml_writer.field("SAVEID",rslt.getReference());
+         rslt.outputValue(xml_writer);
+       }
+      catch (LspBaseException e) {
+         LspLog.logE("DEBUG evaluation problem",e);
+       }
+      lsp.finishMessage(xml_writer);
+    }
+   
+}       // end of inner class ExprEvaluator
 
 
 

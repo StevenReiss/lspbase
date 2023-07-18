@@ -111,20 +111,24 @@ List<FindResult> getResults()
 /*                                                                              */
 /********************************************************************************/
 
-void addResults(Object data,JSONObject err,String what)
+void addResults(JSONArray jarr,String what)
 {
-   if (data == null) return;
-   else if (data instanceof JSONArray) {
-      JSONArray jarr = (JSONArray) data;
-      for (int i = 0; i < jarr.length(); ++i) {
-         addResults(jarr.getJSONObject(i),null,what);
-       }   
-    }
-   else if (data instanceof JSONObject) {
-      processResult((JSONObject) data,what);
-    }
+   for (int i = 0; i < jarr.length(); ++i) {
+      processResult(jarr.getJSONObject(i),what);
+    }   
 }
 
+
+void addResult(JSONObject data,String what)
+{
+   processResult( data,what);
+}
+
+void addResults(Object data,String what)
+{
+   if (data instanceof JSONArray) addResults((JSONArray) data,what);
+   else if (data instanceof JSONObject) addResult((JSONObject) data,what);
+}
 
 private void processResult(JSONObject data,String what)
 {

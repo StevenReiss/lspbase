@@ -577,7 +577,7 @@ void handleGetCompletions(String proj,String bid,String file,int offset,IvyXmlWr
 }
 
 
-void applyWorkspaceEdit(JSONObject wsedit)
+void applyWorkspaceEdit(JSONObject wsedit) throws LspBaseException
 {
    JSONArray chngs = wsedit.getJSONArray("documentChanges");
    for (int i = 0; i < chngs.length(); ++i) {
@@ -601,7 +601,7 @@ void applyWorkspaceEdit(JSONObject wsedit)
 }
 
 
-void applyTextDocumentEdit(JSONObject tdedit) 
+void applyTextDocumentEdit(JSONObject tdedit) throws LspBaseException
 {
    JSONObject tdoc = tdedit.getJSONObject("textDocument");
    LspBaseFile lbf = findFile(null,tdoc.getString("uri"));
@@ -818,8 +818,11 @@ void handlePatternSearch(String proj,String pat,String sf,
       boolean defs,boolean refs,boolean sys,IvyXmlWriter xw)
    throws LspBaseException
 {
-   forAllProjects(proj,(LspBaseProject np) ->  np.patternSearch(pat,sf,defs,refs,sys,xw));
+   forAllProjects(proj,(LspBaseProject np) ->  np.safePatternSearch(pat,sf,defs,refs,sys,xw));
 }
+
+
+
 
 
 

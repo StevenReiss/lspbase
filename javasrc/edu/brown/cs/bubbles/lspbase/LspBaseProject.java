@@ -194,7 +194,7 @@ String getRelativeFile(LspBaseFile f)
 /*										*/
 /********************************************************************************/
 
-void open()
+void open() throws LspBaseException
 {
    if (is_open) return;
 
@@ -299,7 +299,7 @@ void getAllNames(LspNamer namer)
 {
    for (LspBaseFile lbf : project_files) {
       NameHandler nh = new NameHandler(namer,this,lbf);
-      nh.handleResponse(lbf.getSymbols(),null);
+      nh.handleResponse(lbf.getSymbols());
 //    JSONObject tdi = createJson("uri",lbf.getUri());
 //    use_protocol.sendMessage("textDocument/documentSymbol",
 // 	    new NameHandler(namer,this,lbf),
@@ -308,7 +308,7 @@ void getAllNames(LspNamer namer)
 }
 
 
-private class NameHandler implements LspResponder {
+private class NameHandler implements LspArrayResponder {
 
    private LspBaseProject for_project;
    private LspBaseFile for_file;
@@ -321,10 +321,7 @@ private class NameHandler implements LspResponder {
     }
 
 
-   @Override public void handleResponse(Object resp,JSONObject err) {
-      if (err != null) return;
-      if (resp == null) return;
-      JSONArray jarr = (JSONArray) resp;
+   @Override public void handleResponse(JSONArray jarr) {
       use_namer.handleNames(for_project,for_file,jarr);
     }
 
@@ -402,7 +399,10 @@ private void commitFile(LspBaseFile lbf,String bid,
 void build(boolean refresh,boolean reload)
 {
    if (!is_open) {
-      open();
+      try { 
+         open();
+       }
+      catch (LspBaseException e) { }
       return;
     }
 
@@ -484,13 +484,24 @@ private void outputDelta(IvyXmlWriter xw,String act,LspBaseFile ifd)
 /*										*/
 /********************************************************************************/
 
+void safePatternSearch(String pat,String typ,boolean defs,boolean refs,boolean system,IvyXmlWriter xw)
+{
+   try {
+      patternSearch(pat,typ,defs,refs,system,xw);
+    }
+   catch (LspBaseException e) {
+      LspLog.logE("Problem in pattern search",e);
+    }
+}
+   
+   
+   
 void patternSearch(String pat,String typ,boolean defs,boolean refs,boolean system,IvyXmlWriter xw)
+   throws LspBaseException
 {
    LspBasePatternResult sr = new LspBasePatternResult(this,pat,typ,system);
    String fpat = sr.getMatchPattern();
-   use_protocol.sendWorkMessage("workspace/symbol",
-	 (Object data,JSONObject err) -> sr.addResult((JSONArray) data,err),
-	 "query",fpat);
+   use_protocol.sendWorkMessage("workspace/symbol",sr,"query",fpat);
 
    List<JSONObject> rslts = sr.getResults();
    if (rslts.isEmpty()) return;
@@ -509,6 +520,7 @@ void patternSearch(String pat,String typ,boolean defs,boolean refs,boolean syste
 
 void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolean impls,
       boolean type,boolean ronly,boolean wonly,IvyXmlWriter xw)
+   throws LspBaseException
 {
    LineCol lc = file.mapOffsetToLineColumn(start);
    LspBaseFindResult rslt = new LspBaseFindResult(this,file,defs,refs,
@@ -516,7 +528,7 @@ void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolea
    
    if (refs) {
       use_protocol.sendWorkMessage("textDocument/references",
-            (Object data,JSONObject err) -> rslt.addResults(data,err,"REFS"),
+            (JSONArray data) -> rslt.addResults(data,"REFS"),
             "textDocument",file.getTextDocumentId(),
             "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()),
             "context",createJson("includeDeclaration",defs));
@@ -524,7 +536,7 @@ void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolea
    
    if (ronly || wonly) {
       use_protocol.sendWorkMessage("textDocument/documentHighlight",
-            (Object data,JSONObject err) -> rslt.addResults(data,err,"HIGH"),
+            (Object data) -> rslt.addResults(data,"HIGH"),
             "textDocument",file.getTextDocumentId(),
             "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
     }
@@ -532,19 +544,19 @@ void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolea
    if (!type) {
       if (getLanguageData().getCapability("declarationProvider") != null) {
          use_protocol.sendWorkMessage("textDocument/declaration",
-               (Object data,JSONObject err) -> rslt.addResults(data,err,"DECL"),
+               (Object data) -> rslt.addResults(data,"DECL"),
                "textDocument",file.getTextDocumentId(),
                "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
        }
       
       use_protocol.sendWorkMessage("textDocument/definition",
-            (Object data,JSONObject err) -> rslt.addResults(data,err,"DEFS"),
+            (Object data) -> rslt.addResults(data,"DEFS"),
             "textDocument",file.getTextDocumentId(),
             "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
     }
    else {
       use_protocol.sendWorkMessage("textDocument/typeDefinition",
-            (Object data,JSONObject err) -> rslt.addResults(data,err,"TYPE"),
+            (Object data) -> rslt.addResults(data,"TYPE"),
             "textDocument",file.getTextDocumentId(),
             "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn())); 
     }
@@ -552,7 +564,7 @@ void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolea
    if (impls) {
       // might need to be done before definitions?
       use_protocol.sendWorkMessage("textDocument/implementation",
-            (Object data,JSONObject err) -> rslt.addResults(data,err,"IMPL"),
+            (Object data) -> rslt.addResults(data,"IMPL"),
             "textDocument",file.getTextDocumentId(),
             "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn())); 
     }
@@ -610,12 +622,13 @@ void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolea
 /********************************************************************************/
 
 void fullyQualifiedName(LspBaseFile file,int start,int end,IvyXmlWriter xw)
+   throws LspBaseException
 {
    LineCol lc = file.mapOffsetToLineColumn(start);
    LspBaseFindResult rslt = new LspBaseFindResult(this,file,true,false,
          false,false,false,false);
    use_protocol.sendMessage("textDocument/definition",
-         (Object data,JSONObject err) -> rslt.addResults(data,err,"DEFS"),
+         (Object data) -> rslt.addResults(data,"DEFS"),
          "textDocument",file.getTextDocumentId(),
          "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
    for (FindResult fr : rslt.getResults()) {
@@ -674,54 +687,45 @@ void findByKey(LspBaseFile lbf,String key,IvyXmlWriter xw)
 
 
 
-
 /********************************************************************************/
 /*										*/
 /*	File methods								*/
 /*										*/
 /********************************************************************************/
 
-void openFile(LspBaseFile lbf)
+void openFile(LspBaseFile lbf) throws LspBaseException
 {
-   use_protocol.sendMessage("textDocument/didOpen",this::openFileResponse,
+   use_protocol.sendMessage("textDocument/didOpen",
 	 "textDocument",lbf.getTextDocumentItem());
-
-}
-
-
-private void openFileResponse(Object resp,JSONObject err)
-{
 }
 
 
 
 
-
-void willSaveFile(LspBaseFile lbf)
+void willSaveFile(LspBaseFile lbf) throws LspBaseException
 {
    if (lbf.getLanguageData().getCapabilityBool("textDocumentSync.willSave")) {
-      use_protocol.sendMessage("textDocument/willSave",null,
+      use_protocol.sendMessage("textDocument/willSave",
             "textDocument",lbf.getTextDocumentId(),"reason",1);
     }
 }
 
 
 
-void saveFile(LspBaseFile lbf)
+void saveFile(LspBaseFile lbf) throws LspBaseException
 { 
    if (lbf.getLanguageData().getCapabilityBool("textDocumentSync.Save")) {
-      use_protocol.sendMessage("textDocument/didSave",null,
+      use_protocol.sendMessage("textDocument/didSave",
             "textDocument",lbf.getTextDocumentId());
     }
 }
 
 
-void closeFile(LspBaseFile lbf)
+void closeFile(LspBaseFile lbf) throws LspBaseException
 {
-   use_protocol.sendMessage("textDocument/didClose",null,
+   use_protocol.sendMessage("textDocument/didClose",
 	 "textDocument",lbf.getTextDocumentId());
 }
-
 
 
 

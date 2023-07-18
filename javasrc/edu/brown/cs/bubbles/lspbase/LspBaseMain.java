@@ -299,7 +299,15 @@ LspBaseProtocol findProtocol(File ws,String lang,List<LspBasePathSpec> paths)
       proto = new LspBaseProtocol(ws,paths,ld);
       if (ld.isSingleWorkspace()) active_protocols.put(lang,proto);
       workspace_protocols.put(ws,proto);
-      if (ld.isSingleWorkspace()) proto.initialize();
+      if (ld.isSingleWorkspace()) {
+         try {
+            proto.initialize();
+          }
+         catch (LspBaseException e) {
+            LspLog.logE("Can't initialize protocol",e);
+            proto = null;
+          }
+       }
     }
 
    return proto;

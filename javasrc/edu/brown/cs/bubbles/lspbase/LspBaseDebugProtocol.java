@@ -72,7 +72,8 @@ enum InitState {
 };
    
 private LspBaseDebugTarget debug_target;
-private Map<Integer,LspResponder> pending_map;
+private Map<Integer,LspJsonResponder> pending_map;
+private Map<Integer,String> error_map;
 private String client_id;
 private InitState init_state;
 private LspBaseLanguageData for_language;
@@ -95,6 +96,7 @@ LspBaseDebugProtocol(LspBaseDebugManager mgr,LspBaseDebugTarget tgt,LspBaseLangu
    debug_manager = mgr;
    debug_target = tgt;
    pending_map = new HashMap<>();
+   error_map = new HashMap<>();
    for_language = ld;
    config_data = for_language.getDebugConfiguration();
    
@@ -131,7 +133,7 @@ LspBaseDebugProtocol(LspBaseDebugManager mgr,LspBaseDebugTarget tgt,LspBaseLangu
 /*                                                                              */
 /********************************************************************************/
 
-void initialize()
+void initialize() throws LspBaseException
 {
    synchronized (this) {
       if (init_state != InitState.UNINIT) {
@@ -145,11 +147,11 @@ void initialize()
 }
 
 
-private void sendInitialize()
+private void sendInitialize() throws LspBaseException
 {
    JSONObject args = config_data.getJSONObject("initialize");
    args.put("clientID",client_id);
-   localSendRequest("initialize",this::handleInit,true,args);
+   localSendRequest("initialize",this::handleInit,args);
 }
 
 
@@ -157,7 +159,15 @@ private void sendInitialize()
 void waitForInitialization() 
 {
    if (init_state == InitState.INITIALIZED) return;
-   if (init_state == InitState.UNINIT) initialize();
+   if (init_state == InitState.UNINIT) {
+      try {
+         initialize();
+       }
+      catch (LspBaseException e) { 
+         LspLog.logE("DEBUG: problem doing initialization",e);
+       }
+      return;
+    }
    
    synchronized (this) {
       while (init_state != InitState.INITIALIZED) {
@@ -177,7 +187,13 @@ void waitForPreInitialization()
    synchronized (this) {
       if (init_state == InitState.UNINIT) {
          init_state = InitState.START_INIT;
-         sendInitialize();
+         try {
+            sendInitialize();
+          }
+         catch (LspBaseException e) {
+            LspLog.logE("DEBUG: problem doing preinitialization",e);
+            return;
+          }
        }
     }
    
@@ -201,9 +217,8 @@ void waitForPreInitialization()
 }
 
 
-private void handleInit(Object resp,JSONObject err)
+private void handleInit(JSONObject caps)
 {
-   JSONObject caps = (JSONObject) resp;
    for_language.setCapabilities("debug",caps);
    
    LspLog.logD("DEBUG: Received capabilities " + caps.toString(2));
@@ -218,12 +233,22 @@ private void handleInitialized()
    
    LspLog.logD("DEBUG: initialized event");
    
-   debug_manager.updateAllBreakpoints(this);
+   try {
+      debug_manager.updateAllBreakpoints(this);
+    }
+   catch (LspBaseException e) {
+      LspLog.logE("DEBUG problem updating initial breakpoints",e);
+    }
    
    init_state = InitState.DONE_SENT;
    
    if (for_language.getCapabilityBool("debug.supportsConfigurationDoneRequest")) {
-      localSendRequest("configurationDone",null,true,new JSONObject());
+      try {
+         localSendRequest("configurationDone",null,new JSONObject());
+       }
+      catch (LspBaseException e) {
+         LspLog.logE("DEBUG: problem with configurationDone",e);
+       }
     }
    
    synchronized (this) {
@@ -255,24 +280,27 @@ LspBaseLanguageData getLanguage()
 /*                                                                              */
 /********************************************************************************/
 
-void sendRequest(String method,LspResponder resp,Object ... params)
+void sendRequest(String method,LspJsonResponder resp,Object ... params)
+   throws LspBaseException
 {
    JSONObject obj = createJson(params);
    sendJsonRequest(method,resp,obj);
 }
 
 
-void sendEarlyRequest(String method,LspResponder resp,Object ... params)
+void sendEarlyRequest(String method,LspJsonResponder resp,Object ... params)
+   throws LspBaseException
 {
    JSONObject obj = createJson(params);
    
    waitForPreInitialization();
    
-   localSendRequest(method,resp,true,obj);
+   localSendRequest(method,resp,obj);
 }
 
 
-String sendWorkRequest(String method,LspResponder resp,Object ... params)
+String sendWorkRequest(String method,LspJsonResponder resp,Object ... params)
+   throws LspBaseException
 {
    String tok = "WORK_" + progress_counter.getAndIncrement();
    JSONObject obj = createJson(params);
@@ -281,16 +309,18 @@ String sendWorkRequest(String method,LspResponder resp,Object ... params)
    return tok;
 }
 
-void sendJsonRequest(String method,LspResponder resp,JSONObject params)
+void sendJsonRequest(String method,LspJsonResponder resp,JSONObject params)
+   throws LspBaseException
 {
    waitForInitialization();
    
-   localSendRequest(method,resp,true,params);
+   localSendRequest(method,resp,params);
 }
 
 
 
-private void localSendRequest(String method,LspResponder resp,boolean wait,JSONObject params)
+private void localSendRequest(String method,LspJsonResponder resp,JSONObject params)
+   throws LspBaseException
 {
    int id = id_counter.getAndIncrement();
    JSONObject jo = new JSONObject();
@@ -310,9 +340,9 @@ private void localSendRequest(String method,LspResponder resp,boolean wait,JSONO
    
    LspLog.logD("DEBUG: Send " + id + " " + method + " " + len + " " + jo.toString(2));
    
-   if (wait && resp == null) resp = this::dummyHandler;
+   if (resp == null) resp = this::dummyHandler;
    
-   if (resp != null) pending_map.put(id,resp);
+   pending_map.put(id,resp);
    
    synchronized (message_stream) {
       try{
@@ -324,16 +354,19 @@ private void localSendRequest(String method,LspResponder resp,boolean wait,JSONO
        }
     }
    
-   if (wait && resp != null) {
-      synchronized(this) {
-	 while (pending_map.containsKey(id)) {
-	    try {
-	       wait(5000);
-	     }
-	    catch (InterruptedException e) { }
-	  }
+   String err = null;
+   synchronized(this) {
+      while (pending_map.containsKey(id)) {
+         try {
+            wait(5000);
+          }
+         catch (InterruptedException e) { }
        }
     }
+   err = error_map.remove(id);
+   if (err.equals("")) err = null;
+   
+   if (err != null) throw new LspBaseException(err);
 }
 
 
@@ -379,12 +412,9 @@ private void sendResponse(int seq,String cmd,JSONObject resp,String error)
 
 
 
-private void dummyHandler(Object resp,JSONObject err)
-{
-   if (err != null) {
-      LspLog.logE("DEBUG: Unexpected error response: " + err);
-    }
-}
+private void dummyHandler(JSONObject obj)               { }
+
+
 
 
 /********************************************************************************/
@@ -396,20 +426,21 @@ private void dummyHandler(Object resp,JSONObject err)
 void processResponse(JSONObject resp)
 {
    int id = resp.optInt("request_seq");
-   LspResponder lsp = pending_map.get(id);
+   LspJsonResponder lsp = pending_map.get(id);
    LspLog.logD("DEBUG: Reply " + id + " " + (lsp != null) + " " + resp.toString(2));
    
    try {
-      if (resp.getBoolean("success")) {
-         Object cnts = resp.opt("body");
+      if (resp.optBoolean("success")) {
+         JSONObject cnts = resp.optJSONObject("body");
          if (lsp != null) {
-            lsp.handleResponse(cnts,null);
+            lsp.handleResponse(cnts);
           }
        } 
       else {
-        if (lsp != null) {
-           lsp.handleResponse(null,resp);
-         }
+        String msg = resp.optString("error");
+        if (msg == null) msg = resp.optString("message");
+        if (msg == null) msg = "Debug protocol error";
+        error_map.put(id,msg);
        }
     }
    catch (Throwable t) {
@@ -439,6 +470,9 @@ void processRequest(JSONObject req)
          catch (LspBaseException e) {
             sendResponse(seq,cmd,null,e.getMessage());
           }
+         break;
+      default :
+         LspLog.logE("DEBUG: unknwon request " + cmd);
          break;
     }
    

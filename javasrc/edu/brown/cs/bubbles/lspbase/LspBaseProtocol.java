@@ -56,6 +56,7 @@ class LspBaseProtocol implements LspBaseConstants
 /********************************************************************************/
 
 private Map<Integer,LspResponder> pending_map;
+private Map<Integer,String> error_map;
 private String client_id;
 private List<File> work_spaces;
 private List<File> source_roots;
@@ -82,6 +83,7 @@ private static AtomicLong progress_counter = new AtomicLong(1);
 LspBaseProtocol(File workspace,List<LspBasePathSpec> paths,LspBaseLanguageData ld)
 {
    pending_map = new HashMap<>();
+   error_map = new HashMap<>();
    pathWorkspaceMap = new HashMap<>();
    workspacePathMap = new HashMap<>();
 
@@ -181,14 +183,17 @@ void shutDown()
 {
    if (!is_initialized) return;
 
-   localSendMessage("shutdown",null,true,null);
-   localSendMessage("exit",null,false,null);
+   try {
+      localSendMessage("shutdown",true,null);
+      localSendMessage("exit",false,null);
+    }
+   catch (LspBaseException e) { }
 }
 
 
 
 
-void initialize()
+void initialize() throws LspBaseException
 {
    synchronized (this) {
       while (doing_initialization) {
@@ -222,7 +227,7 @@ void initialize()
     }
    localSendMessage("initialize",this::handleInit,true,obj);
 
-   localSendMessage("initialized",null,true,new JSONObject());
+   localSendMessage("initialized",true,new JSONObject());
 
    synchronized (this) {
       doing_initialization = false;
@@ -235,13 +240,8 @@ void initialize()
 
 
 
-private void handleInit(Object resp,JSONObject err)
+private void handleInit(JSONObject init)
 {
-   if (err != null) {
-      return;
-    }
-
-   JSONObject init = (JSONObject) resp;
    JSONObject scaps = init.getJSONObject("capabilities");
    for_language.setCapabilities(scaps);
 }
@@ -275,14 +275,62 @@ JSONObject createPosition(LspBaseFile file,int pos)
 /*										*/
 /********************************************************************************/
 
-void sendMessage(String method,LspResponder resp,Object ... params)
+void sendMessage(String method,LspJsonResponder resp,Object ... params)
+      throws LspBaseException
 {
    JSONObject obj = createJson(params);
    sendJson(method,resp,obj);
 }
 
 
-String sendWorkMessage(String method,LspResponder resp,Object ... params)
+void sendMessage(String method,Object ... params)
+   throws LspBaseException
+{
+   JSONObject obj = createJson(params);
+   sendJson(method,obj);
+}
+
+
+void sendMessage(String method,LspArrayResponder resp,Object ... params)
+   throws LspBaseException
+{
+   JSONObject obj = createJson(params);
+   sendJson(method,resp,obj);
+}
+
+
+void sendMessage(String method,LspAnyResponder resp,Object ... params)
+   throws LspBaseException
+{
+   JSONObject obj = createJson(params);
+   sendJson(method,resp,obj);
+}
+
+
+String sendWorkMessage(String method,LspJsonResponder resp,Object ... params)
+      throws LspBaseException
+{
+   String tok = "WORK_" + progress_counter.getAndIncrement();
+   JSONObject obj = createJson(params);
+   obj.put("workDoneToken",tok);
+   sendJson(method,resp,obj);
+   return tok;
+}
+
+
+String sendWorkMessage(String method,LspArrayResponder resp,Object ... params)
+   throws LspBaseException
+{
+   String tok = "WORK_" + progress_counter.getAndIncrement();
+   JSONObject obj = createJson(params);
+   obj.put("workDoneToken",tok);
+   sendJson(method,resp,obj);
+   return tok;
+}
+
+
+String sendWorkMessage(String method,LspAnyResponder resp,Object ... params)
+   throws LspBaseException
 {
    String tok = "WORK_" + progress_counter.getAndIncrement();
    JSONObject obj = createJson(params);
@@ -292,7 +340,8 @@ String sendWorkMessage(String method,LspResponder resp,Object ... params)
 }
       
 
-void sendJson(String method,LspResponder resp,JSONObject params)
+void sendJson(String method,LspJsonResponder resp,JSONObject params)
+      throws LspBaseException
 {
    if (!is_initialized) initialize();
 
@@ -300,9 +349,71 @@ void sendJson(String method,LspResponder resp,JSONObject params)
 }
 
 
+void sendJson(String method,LspAnyResponder resp,JSONObject params)
+   throws LspBaseException
+{
+   if (!is_initialized) initialize();
+   
+   localSendMessage(method,resp,true,params);
+}
 
 
-private void localSendMessage(String method,LspResponder resp,boolean wait,JSONObject params)
+void sendJson(String method,JSONObject params)
+   throws LspBaseException
+{
+   if (!is_initialized) initialize();
+   
+   localDoSendMessage(method,null,true,params);
+}
+
+
+void sendJson(String method,LspArrayResponder resp,JSONObject params)
+   throws LspBaseException
+{
+   if (!is_initialized) initialize();
+   
+   localSendMessage(method,resp,true,params);
+}
+
+
+
+
+private void localSendMessage(String method,LspJsonResponder resp,boolean wait,JSONObject params)
+      throws LspBaseException
+{
+   if (wait && resp == null) resp = this::dummyHandler;
+   
+   localDoSendMessage(method,resp,wait,params);
+}
+
+
+private void localSendMessage(String method,LspAnyResponder resp,boolean wait,JSONObject params)
+   throws LspBaseException
+{
+   if (wait && resp == null) resp = this::dummyHandler;
+   
+   localDoSendMessage(method,resp,wait,params);
+}
+
+
+private void localSendMessage(String method,boolean wait,JSONObject params)
+   throws LspBaseException
+{
+   LspJsonResponder resp = this::dummyHandler;
+   
+   localDoSendMessage(method,resp,wait,params);
+}
+
+
+private void localSendMessage(String method,LspArrayResponder resp,boolean wait,JSONObject params)
+   throws LspBaseException
+{
+   localDoSendMessage(method,resp,wait,params);
+}
+
+
+private void localDoSendMessage(String method,LspResponder resp,boolean wait,JSONObject params)
+   throws LspBaseException
 {
    int id = id_counter.getAndIncrement();
    JSONObject jo = new JSONObject();
@@ -322,9 +433,10 @@ private void localSendMessage(String method,LspResponder resp,boolean wait,JSONO
 
    LspLog.logD("Send: " + id + " " + method + " " + jo.toString(2));
 
-   if (wait && resp == null) resp = this::dummyHandler;
-
-   if (resp != null) pending_map.put(id,resp);
+   if (resp != null) {
+      pending_map.put(id,resp);
+    }
+   if (!wait) error_map.put(id,"");
 
    synchronized (message_stream) {
       try{
@@ -335,7 +447,8 @@ private void localSendMessage(String method,LspResponder resp,boolean wait,JSONO
 	 LspLog.logE("Problem writing message",e);
        }
     }
-
+   
+   String err = null;
    if (wait && resp != null) {
       synchronized(this) {
 	 while (pending_map.containsKey(id)) {
@@ -344,8 +457,12 @@ private void localSendMessage(String method,LspResponder resp,boolean wait,JSONO
 	     }
 	    catch (InterruptedException e) { }
 	  }
+         err = error_map.remove(id);
+         if (err.equals("")) err = null;
        }
     }
+   
+   if (err != null) throw new LspBaseException(err);
 }
 
 
@@ -381,12 +498,7 @@ private void localSendResponse(int id,Object result,JSONObject err)
 }
 
 
-private void dummyHandler(Object resp,JSONObject err)
-{
-   if (err != null) {
-      LspLog.logE("Unexpected error response: " + err);
-    }
-}
+private void dummyHandler(Object resp)      { }
 
 
 
@@ -394,21 +506,21 @@ void processReply(int id,Object cnts)
 {
    LspResponder lsp = pending_map.get(id);
 
-   String s = (cnts == null ? null : cnts.toString());
-   if (cnts instanceof JSONObject) {
-      JSONObject jcnts = (JSONObject) cnts;
-      s = jcnts.toString(2);
-   }
-   else if (cnts instanceof JSONArray) {
-      JSONArray jcnts = (JSONArray) cnts;
-      s = jcnts.toString(2);
-   }
-   LspLog.logD("Reply: " + id + " " + (lsp != null) + " " + s);
-
    try {
-      if (lsp != null) {
-	 lsp.handleResponse(cnts, null);
+      if (lsp != null && lsp instanceof LspJsonResponder) {
+         LspJsonResponder jlsp = (LspJsonResponder) lsp;
+         JSONObject jobj;
+         if (cnts == JSONObject.NULL) jobj = new JSONObject();
+         else jobj = (JSONObject) cnts;
+	 jlsp.handleResponse(jobj);
       }
+      else if (lsp != null && lsp instanceof LspArrayResponder) {
+         JSONArray jcnts;
+         if (cnts == JSONObject.NULL || cnts == null) jcnts = new JSONArray();
+         else jcnts = (JSONArray) cnts;
+         LspArrayResponder alsp = (LspArrayResponder) lsp;
+         alsp.handleResponse(jcnts);
+       }
    }
    catch (Throwable t) {
       LspLog.logE("Problem processing response",t);
@@ -426,9 +538,22 @@ void processError(int id,JSONObject err)
 {
    LspLog.logE("Process Error " + err.toString(2));
 
-   LspResponder lsp = pending_map.remove(id);
+   LspResponder lsp = pending_map.get(id);
+   String er = error_map.get(id);
    try {
-      if (lsp != null) lsp.handleResponse(null,err);
+      if (lsp != null && er != null && er.equals("")) {
+         error_map.remove(id);
+         if (lsp instanceof LspJsonResponder) {
+            LspJsonResponder jlsp = (LspJsonResponder) lsp;
+            jlsp.handleResponse(null);
+          }
+         else if (lsp instanceof LspArrayResponder) {
+            LspArrayResponder alsp = (LspArrayResponder) lsp;
+            alsp.handleResponse(null);
+          }
+       }
+      String msg = err.optString("error","Protocol error");
+      error_map.put(id,msg);
     }
    catch (Throwable t) {
       LspLog.logE("Problem processing error response",t);
@@ -695,19 +820,19 @@ private class MessageReader extends Thread {
       String method = reply.optString("method",null);
       JSONObject err = reply.optJSONObject("error");
       if (err != null) {
-	 processError(id,err);
+         processError(id,err);
        }
       else if (id == 0 || pending_map.get(id) == null) {
-	 if (method != null) {
-	    Object params = reply.opt("params");
-	    processNotification(id,method,params);
-	  }
-	 else {
-	    LspLog.logE("Problem with message " + reply.toString(2));
-	  }
+         if (method != null) {
+            Object params = reply.opt("params");
+            processNotification(id,method,params);
+          }
+         else {
+            LspLog.logE("Problem with message " + reply.toString(2));
+          }
        }
       else {
-	 processReply(id,reply.opt("result"));
+         processReply(id,reply.opt("result"));
        }
     }
 

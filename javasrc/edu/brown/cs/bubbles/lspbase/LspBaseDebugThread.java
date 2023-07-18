@@ -115,6 +115,7 @@ LspBaseDebugProtocol getProtocol()
 /********************************************************************************/
 
 List<LspBaseDebugStackFrame> getStackFrames()
+   throws LspBaseException
 {
    LspBaseDebugProtocol proto = getProtocol();
    JSONObject format = createJson("hex",false,
@@ -129,9 +130,14 @@ List<LspBaseDebugStackFrame> getStackFrames()
    // for each frame, do a scope command followed by variables
    for (LspBaseDebugStackFrame frm : sf.getFrames()) {
       if (frm.getBaseFile() != null) {
-         proto.sendRequest("scopes",new FrameScoper(frm),
-               "frameId",frm.getId());
-         frm.loadVariables(1);
+         try {
+            proto.sendRequest("scopes",new FrameScoper(frm),
+                  "frameId",frm.getId());
+            frm.loadVariables(1);
+          }
+         catch (LspBaseException e) {
+            LspLog.logE("DEBUG Problem gettting scopes",e);
+          }
        }
     }
  
@@ -140,7 +146,7 @@ List<LspBaseDebugStackFrame> getStackFrames()
 
 
 
-private class FrameScoper implements LspResponder {
+private class FrameScoper implements LspJsonResponder {
    
    private LspBaseDebugStackFrame for_frame;
    
@@ -148,15 +154,14 @@ private class FrameScoper implements LspResponder {
       for_frame = frm;
     }
    
-   @Override public void handleResponse(Object data,JSONObject err) {
-      JSONObject body = (JSONObject) data;
+   @Override public void handleResponse(JSONObject body) {
       JSONArray scps = body.getJSONArray("scopes");
       for_frame.addScopes(scps);
     }
 }
 
 
-private class StackFramer implements LspResponder {
+private class StackFramer implements LspJsonResponder {
    
    private List<LspBaseDebugStackFrame> cur_frames;
    
@@ -166,18 +171,16 @@ private class StackFramer implements LspResponder {
    
    List<LspBaseDebugStackFrame> getFrames()             { return cur_frames; }
    
-   @Override public void handleResponse(Object data,JSONObject err) {
-      if (data instanceof JSONObject) {
-         JSONObject body = (JSONObject) data;
-         JSONArray frames = body.getJSONArray("stackFrames");
-         for (int i = 0; i < frames.length(); ++i) {
-            JSONObject frame = frames.getJSONObject(i);
-            LspBaseDebugStackFrame frm = new LspBaseDebugStackFrame(LspBaseDebugThread.this,i,frame);
-            cur_frames.add(frm);
-          }
+   @Override public void handleResponse(JSONObject body) {
+      JSONArray frames = body.getJSONArray("stackFrames");
+      for (int i = 0; i < frames.length(); ++i) {
+         JSONObject frame = frames.getJSONObject(i);
+         LspBaseDebugStackFrame frm = new LspBaseDebugStackFrame(LspBaseDebugThread.this,i,frame);
+         cur_frames.add(frm);
        }
     }
-}
+   
+}       // end of inner class StackFramer
 
 
 
@@ -188,6 +191,7 @@ private class StackFramer implements LspResponder {
 /********************************************************************************/
 
 boolean debugAction(LspBaseDebugAction action,String frameid)
+      throws LspBaseException
 {
    LspBaseDebugProtocol proto = debug_target.getDebugProtocol();
    ActionStatus sts = new ActionStatus();
@@ -274,6 +278,7 @@ boolean debugAction(LspBaseDebugAction action,String frameid)
 
 void getVariableValue(String fid,String var,int saveid,int depth,int arr,
       boolean detail,IvyXmlWriter xw)
+      throws LspBaseException
 {
    LspBaseDebugProtocol proto = debug_target.getDebugProtocol();
    
@@ -305,7 +310,7 @@ void getVariableValue(String fid,String var,int saveid,int depth,int arr,
 }
 
 
-private class VariableLoader implements LspResponder {
+private class VariableLoader implements LspJsonResponder {
 
    private JSONArray variable_set;
    
@@ -315,8 +320,7 @@ private class VariableLoader implements LspResponder {
    
    JSONArray getVariables()             { return variable_set; }
    
-   @Override public void handleResponse(Object data,JSONObject err) {
-      JSONObject body = (JSONObject) data;
+   @Override public void handleResponse(JSONObject body) {
       variable_set = body.getJSONArray("variables");
     }
    
@@ -325,7 +329,7 @@ private class VariableLoader implements LspResponder {
 
 
 
-private class ActionStatus implements LspResponder {
+private class ActionStatus implements LspJsonResponder {
    
    private boolean is_error;
    
@@ -335,8 +339,7 @@ private class ActionStatus implements LspResponder {
    
    boolean isOkay()                             { return !is_error; }
    
-   @Override public void handleResponse(Object data,JSONObject err) {
-      if (err != null) is_error = true;
+   @Override public void handleResponse(JSONObject data) {
       is_error = false;
     }
    

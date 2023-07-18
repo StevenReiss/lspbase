@@ -80,8 +80,19 @@ enum LspBaseLogLevel {
 /*                                                                              */
 /********************************************************************************/
 
-interface LspResponder {
-   void handleResponse(Object data,JSONObject err);
+interface LspResponder { };
+
+
+interface LspJsonResponder extends LspResponder {
+   void handleResponse(JSONObject body);
+}
+
+interface LspArrayResponder extends LspResponder {
+   void handleResponse(JSONArray body);
+}
+
+interface LspAnyResponder extends LspResponder {
+   void handleResponse(Object body);
 }
 
 

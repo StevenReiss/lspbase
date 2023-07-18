@@ -44,7 +44,7 @@ import java.util.regex.Pattern;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-class LspBasePatternResult implements LspBaseConstants
+class LspBasePatternResult implements LspBaseConstants, LspBaseConstants.LspArrayResponder
 {
 
 
@@ -337,56 +337,51 @@ String makeLspFromWildcard(String wc)
 /*                                                                              */
 /********************************************************************************/
 
-void addResult(JSONArray syms,JSONObject err) 
+@Override public void handleResponse(JSONArray syms) 
 {
-   if (err != null) {
-      LspLog.logD("Search Result Error " + err.toString(2));
-    }
-   else {
-      for (int i = 0; i < syms.length(); ++i) {
-         JSONObject sym = syms.getJSONObject(i);
-         String nm = sym.getString("name");
-         String detail = sym.optString("detail",null);
-         int idx1 = nm.indexOf("(");
-         if (idx1 > 0) {
-            detail = nm.substring(idx1);
-            nm = nm.substring(0,idx1);
-            if (detail.equals("(\u2026)")) detail = null;
-          }
-         
-         Matcher m1 = name_pattern.matcher(nm);
-         if (!m1.matches()) continue;
-         int kind = sym.getInt("kind");
-         if (valid_types != null && !valid_types.contains(kind)) continue;
-         if (container_pattern != null) {
-            String container = sym.optString("containerName");
-            if (container != null) {
-               Matcher m2 = container_pattern.matcher(container);
-               if (!m2.matches()) continue;
-             }
-          }
-         if (detail_pattern != null && detail != null) {
-            Matcher m3 = detail_pattern.matcher(detail);
-            if (!m3.matches()) continue;
-          }
-         
-         JSONObject loc = sym.getJSONObject("location");
-         String uri = loc.getString("uri");
-         if (!allow_system) {
-            LspBaseFile lbf = for_project.findFile(uri);
-            if (lbf == null) continue;
-          }
-         else if (file_pattern != null) {
-            Matcher m4 = file_pattern.matcher(uri);
-            if (!m4.matches()) continue;
-          }
-         
-         if (detail_pattern != null) {
-          }
-         
-         LspLog.logD("Search Result " + sym.toString(2));
-         result_syms.add(sym);
+   for (int i = 0; i < syms.length(); ++i) {
+      JSONObject sym = syms.getJSONObject(i);
+      String nm = sym.getString("name");
+      String detail = sym.optString("detail",null);
+      int idx1 = nm.indexOf("(");
+      if (idx1 > 0) {
+         detail = nm.substring(idx1);
+         nm = nm.substring(0,idx1);
+         if (detail.equals("(\u2026)")) detail = null;
        }
+      
+      Matcher m1 = name_pattern.matcher(nm);
+      if (!m1.matches()) continue;
+      int kind = sym.getInt("kind");
+      if (valid_types != null && !valid_types.contains(kind)) continue;
+      if (container_pattern != null) {
+         String container = sym.optString("containerName");
+         if (container != null) {
+            Matcher m2 = container_pattern.matcher(container);
+            if (!m2.matches()) continue;
+          }
+       }
+      if (detail_pattern != null && detail != null) {
+         Matcher m3 = detail_pattern.matcher(detail);
+         if (!m3.matches()) continue;
+       }
+      
+      JSONObject loc = sym.getJSONObject("location");
+      String uri = loc.getString("uri");
+      if (!allow_system) {
+         LspBaseFile lbf = for_project.findFile(uri);
+         if (lbf == null) continue;
+       }
+      else if (file_pattern != null) {
+         Matcher m4 = file_pattern.matcher(uri);
+         if (!m4.matches()) continue;
+       }
+      
+      if (detail_pattern != null) {
+       }
+      
+      LspLog.logD("Search Result " + sym.toString(2));
+      result_syms.add(sym);
     }
 }
 

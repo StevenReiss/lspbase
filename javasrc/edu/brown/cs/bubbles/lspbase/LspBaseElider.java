@@ -164,7 +164,7 @@ void noteEdit(int soff,int len,int rlen)
 /*                                                                              */
 /********************************************************************************/
 
-boolean computeElision(IvyXmlWriter xw)
+boolean computeElision(IvyXmlWriter xw) throws LspBaseException
 { 
    ElideData data = new ElideData();
    
@@ -201,7 +201,7 @@ boolean computeElision(IvyXmlWriter xw)
 }
 
 
-private class FoldResponder implements LspResponder {
+private class FoldResponder implements LspArrayResponder {
   
    private ElideData elide_data;
    
@@ -209,18 +209,15 @@ private class FoldResponder implements LspResponder {
       elide_data = ed;
     }   
    
-   @Override public void handleResponse(Object resp,JSONObject err) {
-      if (resp instanceof JSONArray) {
-         JSONArray folds = (JSONArray) resp;
-         handleFolds(elide_data,folds);
-       }
+   @Override public void handleResponse(JSONArray folds) {
+      handleFolds(elide_data,folds);
     }
 
 }       // end of inner class FoldResponder
 
 
 
-private class TokenResponder implements LspResponder {
+private class TokenResponder implements LspJsonResponder {
 
    private ElideData elide_data;
    private ElideRange elide_range;
@@ -232,12 +229,9 @@ private class TokenResponder implements LspResponder {
       text_data = td;
     }
    
-   @Override public void handleResponse(Object resp,JSONObject err) {
-      if (resp instanceof JSONObject) {
-         JSONObject robj = (JSONObject) resp;
-         JSONArray data = robj.getJSONArray("data");
-         handleTokens(elide_data,elide_range,text_data,data);
-       }
+   @Override public void handleResponse(JSONObject robj) {
+      JSONArray data = robj.getJSONArray("data");
+      handleTokens(elide_data,elide_range,text_data,data);
     }
    
 }       // end of inner class TokenResponder
@@ -755,7 +749,7 @@ private static class ElideRange {
 /*                                                                              */
 /********************************************************************************/
 
-private class ElideNode implements Comparable<ElideNode>, LspResponder {
+private class ElideNode implements Comparable<ElideNode>, LspJsonResponder {
    
    private int start_offset;
    private int end_offset;
@@ -876,10 +870,13 @@ private class ElideNode implements Comparable<ElideNode>, LspResponder {
          LspBaseProtocol proto = lbp.getProtocol();
          JSONObject ctx = createJson("triggerKind",1,"isRetrigger",false);
          signature_data = null;
-         proto.sendMessage("textDocument/signatureHelp",this,
-               "textDocument",for_file.getTextDocumentId(),
-               "position",proto.createPosition(for_file,hint_location+1),
-               "context",ctx);
+         try {
+            proto.sendMessage("textDocument/signatureHelp",this,
+                  "textDocument",for_file.getTextDocumentId(),
+                  "position",proto.createPosition(for_file,hint_location+1),
+                  "context",ctx);
+          }
+         catch (LspBaseException e) { }
          if (signature_data != null) {
             JSONArray params = signature_data.optJSONArray("parameters");
             if (params != null) {
@@ -908,16 +905,13 @@ private class ElideNode implements Comparable<ElideNode>, LspResponder {
        }
     }
    
-   @Override public void handleResponse(Object data,JSONObject err) {
-      if (data != null && data instanceof JSONObject) {
-         JSONObject help = (JSONObject) data;
-         if (help.isNull("signatures")) return;
-         JSONArray sigs = help.getJSONArray("signatures");
-         if (sigs.length() == 0) return;
-         int idx = help.optInt("activeSignature",0);
-         if (idx < 0 || idx >= sigs.length()) idx = 0;
-         signature_data = sigs.getJSONObject(idx);
-       }
+   @Override public void handleResponse(JSONObject help) {
+      if (help.isNull("signatures")) return;
+      JSONArray sigs = help.getJSONArray("signatures");
+      if (sigs.length() == 0) return;
+      int idx = help.optInt("activeSignature",0);
+      if (idx < 0 || idx >= sigs.length()) idx = 0;
+      signature_data = sigs.getJSONObject(idx);
     }
    
 }       // end of inner class ElideNode

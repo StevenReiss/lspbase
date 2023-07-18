@@ -54,7 +54,6 @@ class LspBaseDebugTarget implements LspBaseConstants
 private LspBaseDebugManager	debug_manager;
 private LspBaseLaunchConfig	launch_config;
 private LspBaseDebugProtocol	debug_protocol;
-private JSONObject		launch_error;
 private boolean 		is_running;
 private boolean                 is_terminated;
 private IvyExec 		cur_exec;
@@ -199,43 +198,43 @@ void startDebug() throws LspBaseException
    JSONObject dbgcfg = debug_protocol.getLanguage().getDebugConfiguration();
 
    String attach = launch_config.getConnectMap();
-   launch_error = null;
+
    is_running = false;
    
-   if (use_flutter) {
-      if (attach == null) {
-         JSONObject args = dbgcfg.getJSONObject("flutterLaunchData");
-         args = fixDebugInfo(args);
-         debug_protocol.sendJsonRequest("launch",this::debugStarted,args);
+   try {
+      if (use_flutter) {
+         if (attach == null) {
+            JSONObject args = dbgcfg.getJSONObject("flutterLaunchData");
+            args = fixDebugInfo(args);
+            debug_protocol.sendJsonRequest("launch",this::debugStarted,args);
+          }
+         else {
+            JSONObject args = dbgcfg.getJSONObject("flutterAttachData");
+            args = fixDebugInfo(args);
+            debug_protocol.sendJsonRequest("attach",this::debugStarted,args);
+          }
        }
       else {
-         JSONObject args = dbgcfg.getJSONObject("flutterAttachData");
-         args = fixDebugInfo(args);
-         debug_protocol.sendJsonRequest("attach",this::debugStarted,args);
+         if (attach == null) {
+            JSONObject args = dbgcfg.getJSONObject("launchData");
+            args = fixDebugInfo(args);
+            debug_protocol.sendJsonRequest("launch",this::debugStarted,args);
+          }
+         else {
+            JSONObject args = dbgcfg.getJSONObject("attachData");
+            args = fixDebugInfo(args);
+            debug_protocol.sendJsonRequest("attach",this::debugStarted,args);
+          }
        }
     }
-   else {
-      if (attach == null) {
-         JSONObject args = dbgcfg.getJSONObject("launchData");
-         args = fixDebugInfo(args);
-         debug_protocol.sendJsonRequest("launch",this::debugStarted,args);
-       }
-      else {
-         JSONObject args = dbgcfg.getJSONObject("attachData");
-         args = fixDebugInfo(args);
-         debug_protocol.sendJsonRequest("attach",this::debugStarted,args);
-       }
+   catch (LspBaseException e) {
+      is_terminated = true;
+      throw new LspBaseException("Start debug failed " + e.getMessage(),e);
     }
 
-   if (launch_error != null) {
-      is_terminated = true;
-      throw new LspBaseException("Start debug failed: " + launch_error.optString("error"));
-    }
-   else {
-      is_running = true;
-      is_terminated = false;
-      postProcessEvent("CREATE");
-    }
+   is_running = true;
+   is_terminated = false;
+   postProcessEvent("CREATE");
 }
 
 
@@ -289,13 +288,12 @@ private JSONObject fixDebugInfo(JSONObject data)
 
 
 
-private void debugStarted(Object data,JSONObject err)
-{
-   launch_error = err;
-}
+private void debugStarted(JSONObject err)       { }
+
 
 
 void debugAction(LspBaseDebugAction action,String threadid,String frameid,IvyXmlWriter xw)
+      throws LspBaseException
 {
    if (!is_running) return;
 
@@ -397,12 +395,17 @@ void getStackFrames(int tid,int count,int depth,int arrsz,IvyXmlWriter xw)
 	 xw.field("ID",thrd.getId());
 	 xw.field("TARGET",getId());
 	 int ctr = 0;
-	 for (LspBaseDebugStackFrame frm : thrd.getStackFrames()) {
-	    if (frm == null) continue;
-	    frm.outputXml(xw,ctr,depth);
-	    if (count > 0 && ctr > count) break;
-	    ++ctr;
-	  }
+         try {
+            for (LspBaseDebugStackFrame frm : thrd.getStackFrames()) {
+               if (frm == null) continue;
+               frm.outputXml(xw,ctr,depth);
+               if (count > 0 && ctr > count) break;
+               ++ctr;
+             }
+          }
+         catch (LspBaseException e) {
+            LspLog.logE("DEBUG problem getting stack frames",e);
+          }
 	 xw.end("THREAD");
        }
     }
@@ -417,6 +420,7 @@ void getStackFrames(int tid,int count,int depth,int arrsz,IvyXmlWriter xw)
 
 void getVariableValue(String tid,String fid,String var,int saveid,int depth,int arr,
       boolean detail,IvyXmlWriter xw)
+      throws LspBaseException
 {
    for (LspBaseDebugThread thrd : thread_data.values()) {
       if (matchThread(tid,thrd)) {
@@ -684,8 +688,10 @@ private class ProcessData {
       postProcessEvent("TERMINATE");
     }		
 
+   @SuppressWarnings("unused")
    String getName()			{ return process_name; }
 
+   @SuppressWarnings("unused")
    int getId() {
       if (system_id > 0) return system_id;
       return hashCode();

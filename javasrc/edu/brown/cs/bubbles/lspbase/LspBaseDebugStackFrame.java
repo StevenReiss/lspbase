@@ -109,8 +109,8 @@ int getId()                     { return frame_id; }
 /*                                                                              */
 /********************************************************************************/
 
-void evaluateExpression(String bid,String eid,String expr,int frame,boolean stop,
-      IvyXmlWriter xw)
+LspBaseDebugVariable evaluateExpression(String expr) 
+      throws LspBaseException
 { 
    LspBaseDebugProtocol proto = for_thread.getProtocol();
    EvalHandler eh = new EvalHandler();
@@ -122,12 +122,13 @@ void evaluateExpression(String bid,String eid,String expr,int frame,boolean stop
    JSONObject rslt = eh.getResult();
    LspLog.logD("Evaluation result " + rslt);
    LspBaseDebugVariable var = new LspBaseDebugVariable(rslt,getThread());
-   var.outputValue(xw);
+   
+   return var;
 }
 
 
 
-private class EvalHandler implements LspResponder {
+private class EvalHandler implements LspJsonResponder {
    
    private JSONObject eval_result;
    
@@ -137,8 +138,8 @@ private class EvalHandler implements LspResponder {
    
    JSONObject getResult()               { return eval_result; }
    
-   @Override public void handleResponse(Object resp,JSONObject err) {
-      eval_result = (JSONObject) resp;
+   @Override public void handleResponse(JSONObject resp) {
+      eval_result = resp;
     }
 }
 
@@ -177,15 +178,20 @@ void loadVariables(int depth)
          frame_variables.add(vd);
        }
       else {
-         proto.sendRequest("variables",new VariableLoader(sd),
-               "variablesReference",sd.getReferenceNumber());
+         try {
+            proto.sendRequest("variables",new VariableLoader(sd),
+                  "variablesReference",sd.getReferenceNumber());
+          }
+         catch (LspBaseException e) {
+            LspLog.logE("DEBUG problem loading variables",e);
+          }
        }
     }
 }
 
 
 
-private class VariableLoader implements LspResponder {
+private class VariableLoader implements LspJsonResponder {
    
    private LspBaseDebugScope scope_data;
    
@@ -193,8 +199,7 @@ private class VariableLoader implements LspResponder {
       scope_data = sd;
     }
    
-   @Override public void handleResponse(Object data,JSONObject err) {
-      JSONObject body = (JSONObject) data;
+   @Override public void handleResponse(JSONObject body) {
       JSONArray vars = body.getJSONArray("variables");
       for (int i = 0; i < vars.length(); ++i) {
          JSONObject var = vars.getJSONObject(i);
@@ -203,7 +208,8 @@ private class VariableLoader implements LspResponder {
        }
     
     }
-}
+   
+}       // end of inner class VariableLoader
 
 
 /********************************************************************************/
