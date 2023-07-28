@@ -1,21 +1,21 @@
 /********************************************************************************/
-/*                                                                              */
-/*              LspBaseDebugManager.java                                        */
-/*                                                                              */
-/*      Interface to the debugger                                               */
-/*                                                                              */
+/*										*/
+/*		LspBaseDebugManager.java					*/
+/*										*/
+/*	Interface to the debugger						*/
+/*										*/
 /********************************************************************************/
-/*      Copyright 2011 Brown University -- Steven P. Reiss                    */
+/*	Copyright 2011 Brown University -- Steven P. Reiss		      */
 /*********************************************************************************
- *  Copyright 2011, Brown University, Providence, RI.                            *
- *                                                                               *
- *                        All Rights Reserved               z                     *
- *                                                                               *
- * This program and the accompanying materials are made available under the      *
+ *  Copyright 2011, Brown University, Providence, RI.				 *
+ *										 *
+ *			  All Rights Reserved		    z			  *
+ *										 *
+ * This program and the accompanying materials are made available under the	 *
  * terms of the Eclipse Public License v1.0 which accompanies this distribution, *
- * and is available at                                                           *
- *      http://www.eclipse.org/legal/epl-v10.html                                *
- *                                                                               *
+ * and is available at								 *
+ *	http://www.eclipse.org/legal/epl-v10.html				 *
+ *										 *
  ********************************************************************************/
 
 
@@ -24,6 +24,7 @@ package edu.brown.cs.bubbles.lspbase;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,10 +35,14 @@ import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
+import javax.sql.rowset.spi.XmlWriter;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.w3c.dom.Element;
 
+import edu.brown.cs.ivy.exec.IvyExec;
+import edu.brown.cs.ivy.xml.IvyJsonReader;
 import edu.brown.cs.ivy.xml.IvyXml;
 import edu.brown.cs.ivy.xml.IvyXmlWriter;
 
@@ -46,9 +51,9 @@ class LspBaseDebugManager implements LspBaseConstants
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Private Storage                                                         */
-/*                                                                              */
+/*										*/
+/*	Private Storage 							*/
+/*										*/
 /********************************************************************************/
 
 private LspBaseMain		lsp_base;
@@ -60,14 +65,14 @@ private Map<Integer,LspBaseBreakpoint> break_ids;
 private Map<String,LspBaseDebugTarget> target_map;
 private LspBaseBreakpoint	exception_breakpoint;
 private Map<LspBaseDebugTarget,LspBaseDebugProtocol> debug_protocols;
-private boolean                 is_started;
+private boolean 		is_started;
 
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Constructors                                                            */
-/*                                                                              */
+/*										*/
+/*	Constructors								*/
+/*										*/
 /********************************************************************************/
 
 LspBaseDebugManager(LspBaseMain nm)
@@ -101,7 +106,7 @@ private synchronized void waitForStart()
 {
    while (!is_started) {
       try {
-         wait(5000);
+	 wait(5000);
        }
       catch (InterruptedException e) { }
     }
@@ -109,133 +114,142 @@ private synchronized void waitForStart()
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Command handler                                                         */
-/*                                                                              */
+/*										*/
+/*	Command handler 							*/
+/*										*/
 /********************************************************************************/
 
 void handleCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
    throws LspBaseException
 {
-   waitForStart(); 
-   
+   waitForStart();
+
    switch (cmd) {
+      case "LAUNCHES" :
+      case "LANGUAGEDATA" :
+	 getLanguageData(proj,xw);
+	 break;
+      case "LAUNCHQUERY" :
+	 handleLaunchQuery(proj,
+	       IvyXml.getAttrString(xml,"QUERY"),
+	       IvyXml.getAttrBool(xml,"OPTION"),xw);
+	  break;
       case "GETRUNCONFIG" :
-         getRunConfigurations(xw);
-         break;
+	 getRunConfigurations(xw);
+	 break;
       case "NEWRUNCONFIG" :
-         getNewRunConfiguration(proj,
-               IvyXml.getAttrString(xml,"NAME"),
-               IvyXml.getAttrString(xml,"CLONE"),xw);
-         break;
+	 getNewRunConfiguration(proj,
+	       IvyXml.getAttrString(xml,"NAME"),
+	       IvyXml.getAttrString(xml,"CLONE"),xw);
+	 break;
       case "EDITRUNCONFIG" :
-         editRunConfiguration(IvyXml.getAttrString(xml,"LAUNCH"),
-               IvyXml.getAttrEnum(xml,"PROP",LspBaseConfigAttribute.NONE),
-               IvyXml.getAttrString(xml,"VALUE"),xw);
-         break;
+	 editRunConfiguration(IvyXml.getAttrString(xml,"LAUNCH"),
+	       IvyXml.getAttrEnum(xml,"PROP",LspBaseConfigAttribute.NONE),
+	       IvyXml.getAttrString(xml,"VALUE"),xw);
+	 break;
       case "SAVERUNCONFIG" :
-         saveRunConfiguration(IvyXml.getAttrString(xml,"LAUNCH"),xw);
-         break;
+	 saveRunConfiguration(IvyXml.getAttrString(xml,"LAUNCH"),xw);
+	 break;
       case "DELETERUNCONFIG" :
-         deleteRunConfiguration(IvyXml.getAttrString(xml,"LAUNCH"),xw);
-         break;
-         
+	 deleteRunConfiguration(IvyXml.getAttrString(xml,"LAUNCH"),xw);
+	 break;
+
       case "GETALLBREAKPOINTS" :
-         getAllBreakpoints(xw);
-         break;
+	 getAllBreakpoints(xw);
+	 break;
       case "ADDLINEBREAKPOINT" :
-         setLineBreakpoint(proj,IvyXml.getAttrString(xml,"BID","*"),
-               IvyXml.getTextElement(xml,"FILE"),
-               IvyXml.getAttrInt(xml,"LINE"),
-               IvyXml.getAttrBool(xml,"TRACE",false));
-         break;
+	 setLineBreakpoint(proj,IvyXml.getAttrString(xml,"BID","*"),
+	       IvyXml.getTextElement(xml,"FILE"),
+	       IvyXml.getAttrInt(xml,"LINE"),
+	       IvyXml.getAttrBool(xml,"TRACE",false));
+	 break;
       case "ADDEXCEPTIONBREAKPOINT" :
-         setExceptionBreakpoint(proj,IvyXml.getAttrString(xml,"CLASS"),
-               IvyXml.getAttrBool(xml,"CAUGHT",false),
-               IvyXml.getAttrBool(xml,"UNCAUGHT",true),
-               IvyXml.getAttrBool(xml,"CHECKED",false));
-         break;
+	 setExceptionBreakpoint(proj,IvyXml.getAttrString(xml,"CLASS"),
+	       IvyXml.getAttrBool(xml,"CAUGHT",false),
+	       IvyXml.getAttrBool(xml,"UNCAUGHT",true),
+	       IvyXml.getAttrBool(xml,"CHECKED",false));
+	 break;
       case "EDITBREAKPOINT" :
-         editBreakpoint(IvyXml.getAttrString(xml,"ID"),
-               IvyXml.getAttrString(xml,"PROP"),
-               IvyXml.getAttrString(xml,"VALUE"),
-               IvyXml.getAttrString(xml,"PROP1"),
-               IvyXml.getAttrString(xml,"VALUE1"),
-               IvyXml.getAttrString(xml,"PROP2"),
-               IvyXml.getAttrString(xml,"VALUE2"));
-         break;
+	 editBreakpoint(IvyXml.getAttrString(xml,"ID"),
+	       IvyXml.getAttrString(xml,"PROP"),
+	       IvyXml.getAttrString(xml,"VALUE"),
+	       IvyXml.getAttrString(xml,"PROP1"),
+	       IvyXml.getAttrString(xml,"VALUE1"),
+	       IvyXml.getAttrString(xml,"PROP2"),
+	       IvyXml.getAttrString(xml,"VALUE2"));
+	 break;
       case "CLEARALLLINEBREAKPOINTS" :
-         clearLineBreakpoints(proj,null,0);
-         break;
+	 clearLineBreakpoints(proj,null,0);
+	 break;
       case "CLEARLINEBREAKPOINT" :
-         clearLineBreakpoints(proj,IvyXml.getAttrString(xml,"FILE"),
-               IvyXml.getAttrInt(xml,"LINE"));
-         break;
-         
+	 clearLineBreakpoints(proj,IvyXml.getAttrString(xml,"FILE"),
+	       IvyXml.getAttrInt(xml,"LINE"));
+	 break;
+
       case "START" :
-         runProject(IvyXml.getAttrString(xml,"NAME"),xw);
-         break;
+	 runProject(IvyXml.getAttrString(xml,"NAME"),xw);
+	 break;
       case "DEBUGACTION" :
-         debugAction(IvyXml.getAttrString(xml,"LAUNCH"),
-               IvyXml.getAttrString(xml,"TARGET"),
-               IvyXml.getAttrString(xml,"PROCESS"),
-               IvyXml.getAttrString(xml,"THREAD"),
-               IvyXml.getAttrString(xml,"FRAME"),
-               IvyXml.getAttrEnum(xml,"ACTION",LspBaseDebugAction.NONE),xw);
-         break;
+	 debugAction(IvyXml.getAttrString(xml,"LAUNCH"),
+	       IvyXml.getAttrString(xml,"TARGET"),
+	       IvyXml.getAttrString(xml,"PROCESS"),
+	       IvyXml.getAttrString(xml,"THREAD"),
+	       IvyXml.getAttrString(xml,"FRAME"),
+	       IvyXml.getAttrEnum(xml,"ACTION",LspBaseDebugAction.NONE),xw);
+	 break;
       case "CONSOLEINPUT" :
-         consoleInput(IvyXml.getAttrString(xml,"LAUNCH"),
-               IvyXml.getTextElement(xml,"INPUT"));
-         break;
+	 consoleInput(IvyXml.getAttrString(xml,"LAUNCH"),
+	       IvyXml.getTextElement(xml,"INPUT"));
+	 break;
       case "GETSTACKFRAMES" :
-         getStackFrames(IvyXml.getAttrString(xml,"LAUNCH"),
-               IvyXml.getAttrInt(xml,"THREAD",0),
-               IvyXml.getAttrInt(xml,"COUNT",-1),
-               IvyXml.getAttrInt(xml,"DEPTH",0),
-               IvyXml.getAttrInt(xml,"ARRAY",100),xw);
-         break;
+	 getStackFrames(IvyXml.getAttrString(xml,"LAUNCH"),
+	       IvyXml.getAttrInt(xml,"THREAD",0),
+	       IvyXml.getAttrInt(xml,"COUNT",-1),
+	       IvyXml.getAttrInt(xml,"DEPTH",0),
+	       IvyXml.getAttrInt(xml,"ARRAY",100),xw);
+	 break;
       case "VARVAL" :
-         getVariableValue(IvyXml.getAttrString(xml,"THREAD"),
-               IvyXml.getAttrString(xml,"FRAME"),
-               IvyXml.getTextElement(xml,"VAR"),
-               IvyXml.getAttrInt(xml,"SAVEID",0),
-               IvyXml.getAttrInt(xml,"DEPTH",1),
-               IvyXml.getAttrInt(xml,"ARRAY",100),false,xw);
-         break;
+	 getVariableValue(IvyXml.getAttrString(xml,"THREAD"),
+	       IvyXml.getAttrString(xml,"FRAME"),
+	       IvyXml.getTextElement(xml,"VAR"),
+	       IvyXml.getAttrInt(xml,"SAVEID",0),
+	       IvyXml.getAttrInt(xml,"DEPTH",1),
+	       IvyXml.getAttrInt(xml,"ARRAY",100),false,xw);
+	 break;
       case "VARDETAIL" :
-         getVariableValue(IvyXml.getAttrString(xml,"THREAD"),
-               IvyXml.getAttrString(xml,"FRAME"),
-               IvyXml.getTextElement(xml,"VAR"),
-               IvyXml.getAttrInt(xml,"SAVEID",0),
-               IvyXml.getAttrInt(xml,"DEPTH",1),
-               IvyXml.getAttrInt(xml,"ARRAY",100),true,xw);
-         break;
-            
+	 getVariableValue(IvyXml.getAttrString(xml,"THREAD"),
+	       IvyXml.getAttrString(xml,"FRAME"),
+	       IvyXml.getTextElement(xml,"VAR"),
+	       IvyXml.getAttrInt(xml,"SAVEID",0),
+	       IvyXml.getAttrInt(xml,"DEPTH",1),
+	       IvyXml.getAttrInt(xml,"ARRAY",100),true,xw);
+	 break;
+
       case "EVALUATE" :
-         evaluateExpression(proj,
-               IvyXml.getAttrString(xml,"BID","*"),
-               IvyXml.getTextElement(xml,"EXPR"),
-               IvyXml.getAttrInt(xml,"THREAD"),
-               IvyXml.getAttrString(xml,"FRAME"),
-               IvyXml.getAttrBool(xml,"IMPLICIT",false),
-               IvyXml.getAttrBool(xml,"BREAK",true),
-               IvyXml.getAttrString(xml,"REPLYID"),
-               IvyXml.getAttrInt(xml,"LEVEL"),
-               IvyXml.getAttrInt(xml,"ARRAY",100),
-               IvyXml.getAttrString(xml,"SAVEID"),
-               IvyXml.getAttrBool(xml,"ALLFRAMES"),xw);
-         break;
+	 evaluateExpression(proj,
+	       IvyXml.getAttrString(xml,"BID","*"),
+	       IvyXml.getTextElement(xml,"EXPR"),
+	       IvyXml.getAttrInt(xml,"THREAD"),
+	       IvyXml.getAttrString(xml,"FRAME"),
+	       IvyXml.getAttrBool(xml,"IMPLICIT",false),
+	       IvyXml.getAttrBool(xml,"BREAK",true),
+	       IvyXml.getAttrString(xml,"REPLYID"),
+	       IvyXml.getAttrInt(xml,"LEVEL"),
+	       IvyXml.getAttrInt(xml,"ARRAY",100),
+	       IvyXml.getAttrString(xml,"SAVEID"),
+	       IvyXml.getAttrBool(xml,"ALLFRAMES"),xw);
+	 break;
       default :
-	 throw new LspBaseException("Unknown LSPBASE debug command " + cmd);   
+	 throw new LspBaseException("Unknown LSPBASE debug command " + cmd);
     }
 }
 
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Setup debug protocol                                                    */
-/*                                                                              */
+/*										*/
+/*	Setup debug protocol							*/
+/*										*/
 /********************************************************************************/
 
 LspBaseDebugProtocol getDebugProtocol(LspBaseDebugTarget tgt)
@@ -244,22 +258,154 @@ LspBaseDebugProtocol getDebugProtocol(LspBaseDebugTarget tgt)
    LspBaseDebugProtocol ldp = debug_protocols.get(tgt);
    if (ldp == null) {
       synchronized (debug_protocols) {
-         ldp = debug_protocols.get(tgt);
-         if (ldp == null) {
-            ldp = new LspBaseDebugProtocol(this,tgt,ld);
-            debug_protocols.put(tgt,ldp);
-            try {
-               ldp.initialize();
-             }
-            catch (LspBaseException e) {
-               LspLog.logE("DEBUG: problem initializig protocol",e);
-             }
-          }
+	 ldp = debug_protocols.get(tgt);
+	 if (ldp == null) {
+	    ldp = new LspBaseDebugProtocol(this,tgt,ld);
+	    debug_protocols.put(tgt,ldp);
+	    try {
+	       ldp.initialize();
+	     }
+	    catch (LspBaseException e) {
+	       LspLog.logE("DEBUG: problem initializig protocol",e);
+	     }
+	  }
        }
     }
    return ldp;
 }
 
+
+
+
+/********************************************************************************/
+/*										*/
+/*	Launch Configuration Support						*/
+/*										*/
+/********************************************************************************/
+
+private void getLanguageData(String proj,IvyXmlWriter xw)
+{
+   LspBaseLanguageData ld = null;
+
+   if (proj != null) {
+      try {
+	 LspBaseProject lspproj = lsp_base.getProjectManager().findProject(proj);
+	 ld = lspproj.getLanguageData();
+       }
+      catch (LspBaseException e) {
+	 ld = lsp_base.getBaseLanguage();
+       }
+    }
+   else {
+      ld = lsp_base.getBaseLanguage();
+    }
+
+   String nm = "resources/lspbase-launches-" + ld.getName() + ".xml";
+   InputStream ins = LspBaseDebugManager.class.getClassLoader().getResourceAsStream(nm);
+   Element xml = IvyXml.loadXmlFromStream(ins);
+   xw.writeXml(xml);
+}
+
+
+
+private void handleLaunchQuery(String proj,String query,boolean option,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   switch (query) {
+      case "START" :
+	 getStartFiles(proj,option,xw);
+	 break;
+      case "DEVICE" :
+	 getDevices(xw);
+	 break;
+    }
+}
+
+
+
+private void getStartFiles(String proj,boolean lib,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseProject lspproj = lsp_base.getProjectManager().findProject(proj);
+   LspBaseProtocol proto = lspproj.getProtocol();
+   MainFinder mf = new MainFinder(lspproj,lib,xw);
+   proto.sendWorkMessage("workspace/symbol",mf,"query","main");
+}
+
+
+private class MainFinder implements LspArrayResponder {
+
+   private boolean use_library;
+   private LspBaseProject for_project;
+   private IvyXmlWriter xml_writer;
+
+   MainFinder(LspBaseProject lbp,boolean lib,IvyXmlWriter xw) {
+      for_project = lbp;
+      use_library = lib;
+      xml_writer = xw;
+    }
+
+   @Override public void handleResponse(JSONArray arr) {
+      for (int i = 0; i < arr.length(); ++i) {
+	 JSONObject sym = arr.getJSONObject(i);
+	 if (!sym.getString("name").equals("main")) continue;
+	 if (sym.getInt("symbolKind") != 12) continue;
+	 String uri = sym.getJSONObject("location").getString("uri");
+	 File f = null;
+	 if (!use_library) {
+	    LspBaseFile lbf = for_project.findFile(uri);
+	    if (lbf == null) continue;
+	    f = lbf.getFile();
+	  }
+	 else {
+	    if (uri.startsWith("file:/")) {
+	       int j = 0;
+	       for (int k = 5; i < uri.length(); ++k) {
+		  if (uri.charAt(k) == '/') j = k;
+		  else break;
+		}
+	       uri = uri.substring(j);
+	     }
+	    f = new File(uri);
+	    if (!f.exists()) continue;
+	  }
+	 xml_writer.begin("OPTION");
+	 xml_writer.field("VALUE",f.getPath());
+	 xml_writer.end("OPTION");
+       }
+    }
+
+}	// end of inner class MainFinder
+
+
+
+private void getDevices(IvyXmlWriter xw)
+   throws LspBaseException
+{
+   try {
+      IvyExec exec = new IvyExec("flutter devices --machine",
+	    IvyExec.READ_OUTPUT|IvyExec.ERROR_OUTPUT);
+      InputStream ins = exec.getInputStream();
+      IvyJsonReader jr = new IvyJsonReader(ins);
+      String jsonstr = jr.readJson();
+      JSONArray arr = new JSONArray(jsonstr);
+      for (int i = 0; i < arr.length(); ++i) {
+	 JSONObject dev = arr.getJSONObject(i);
+	 if (!dev.optBoolean("isSupported",true)) continue;
+	 String nm = dev.getString("name");
+	 if (dev.optBoolean("emulator")) nm += " (Emulator)";
+	 xw.begin("OPTION");
+	 xw.field("DISPLAY",nm);
+	 xw.field("VALUE",dev.getString("id"));
+	 xw.end("OPTION");
+       }
+      jr.close();
+      exec.destroy();
+    }
+   catch (IOException e) {
+      throw new LspBaseException("Problem getting devices",e);
+    }
+}
 
 
 
@@ -285,7 +431,7 @@ void getNewRunConfiguration(String proj,String name,String clone,IvyXmlWriter xw
       if (name == null) name = getUniqueName("New Launch");
       plc = new LspBaseLaunchConfig(lspproj,name);
     }
-   
+
    if (plc != null) {
       if (proj != null) plc.setAttribute(LspBaseConfigAttribute.PROJECT_ATTR,proj);
       config_map.put(plc.getId(),plc);
@@ -300,7 +446,7 @@ void editRunConfiguration(String id,LspBaseConfigAttribute prop,String value,Ivy
 {
    LspBaseLaunchConfig cfg = config_map.get(id);
    if (cfg == null) throw new LspBaseException("Launch configuration " + id + " not found");
-   
+
    cfg = cfg.getWorkingCopy();
    if (prop == LspBaseConfigAttribute.NAME) {
       cfg.setName(value);
@@ -308,9 +454,9 @@ void editRunConfiguration(String id,LspBaseConfigAttribute prop,String value,Ivy
    else {
       cfg.setAttribute(prop,value);
     }
-   
+
    if (xw != null) cfg.outputBubbles(xw);
-   
+
    handleLaunchNotify(cfg,"CHANGE");
 }
 
@@ -319,13 +465,13 @@ void saveRunConfiguration(String id,IvyXmlWriter xw) throws LspBaseException
 {
    LspBaseLaunchConfig cfg = config_map.get(id);
    if (cfg == null) throw new LspBaseException("Launch configuration " + id + " not found");
-   
+
    cfg.commitWorkingCopy();
-   
+
    saveConfigurations();
-   
+
    if (xw != null) cfg.outputBubbles(xw);
-   
+
    handleLaunchNotify(cfg,"CHANGE");
 }
 
@@ -336,7 +482,7 @@ void deleteRunConfiguration(String id,IvyXmlWriter xw)
    if (cfg == null) return;
    cfg.setSaved(false);
    saveConfigurations();
-   
+
    handleLaunchNotify(cfg,"REMOVE");
 }
 
@@ -374,7 +520,7 @@ Iterable<LspBaseBreakpoint> getBreakpoints()
    return break_map.values();
 }
 
-LspBaseBreakpoint findBreakpoint(int id) 
+LspBaseBreakpoint findBreakpoint(int id)
 {
    return break_ids.get(id);
 }
@@ -397,7 +543,7 @@ void setLineBreakpoint(String proj,String bid,String file,int line,boolean trace
    throws LspBaseException
 {
    LspBaseFile nf = lsp_base.getFileData(proj,file);
-   
+
    for (LspBaseBreakpoint prev : break_map.values()) {
       if (prev.getType() == BreakType.LINE &&
 	    prev.getFile().equals(nf) &&
@@ -405,7 +551,7 @@ void setLineBreakpoint(String proj,String bid,String file,int line,boolean trace
 	 return;
        }
     }
-   
+
    LspBaseBreakpoint pb = LspBaseBreakpoint.createLineBreakpoint(nf,line);
    break_map.put(pb.getId(),pb);
    handleBreakNotify(pb,"ADD");
@@ -423,10 +569,10 @@ void setExceptionBreakpoint(String proj,String name,
    if (proj != null) {
       lbp = lsp_base.getProjectManager().findProject(proj);
     }
-   
+
    if (exception_breakpoint == null && name == null) {
       exception_breakpoint = LspBaseBreakpoint.createExceptionBreakpoint(lbp,null,
-            caught,uncaught);
+	    caught,uncaught);
       break_map.put(exception_breakpoint.getId(),exception_breakpoint);
       handleBreakNotify(exception_breakpoint,"ADD");
     }
@@ -441,7 +587,7 @@ void setExceptionBreakpoint(String proj,String name,
       saveBreakpoints();
       handleBreakNotify(pb,"ADD");
     }
-   
+
    updateExceptionBreakpoints(lbp);
    saveBreakpoints();
 }
@@ -452,7 +598,7 @@ void editBreakpoint(String id,String ... pv)
 {
    LspBaseBreakpoint bp = break_map.get(id);
    if (bp == null) throw new LspBaseException("Breakpoint " + id + " not found");
-   
+
    for (int i = 0; i < pv.length; i += 2) {
       String p = pv[i];
       String v = pv[i+1];
@@ -466,41 +612,41 @@ void editBreakpoint(String id,String ... pv)
        }
       else bp.setProperty(p,v);
     }
-   
+
    switch (bp.getType()) {
       case LINE :
-         updateBreakpointsForFile(bp.getFile());
-         break;
+	 updateBreakpointsForFile(bp.getFile());
+	 break;
       case DATA :
-         break;
+	 break;
       case EXCEPTION :
-         updateExceptionBreakpoints(bp.getProject());
-         break;
+	 updateExceptionBreakpoints(bp.getProject());
+	 break;
       case FUNCTION :
-         break;
+	 break;
       case NONE :
-         break;
+	 break;
     }
-   
+
    handleBreakNotify(bp,"CHANGE");
 }
 
 
-void handleBreakpointEvent(JSONObject body) 
+void handleBreakpointEvent(JSONObject body)
 {
    JSONObject jbpt = body.getJSONObject("breakpoint");
    String reason = body.getString("reason");
    switch (reason) {
       case "new" :
-         reason = "ADD";
-         break;
+	 reason = "ADD";
+	 break;
       case "removed" :
-         reason = "REMOVE";
-         break;
+	 reason = "REMOVE";
+	 break;
       case "changed" :
       default :
-         reason = "CHANGE";
-         break;
+	 reason = "CHANGE";
+	 break;
     }
    int id = jbpt.getInt("id");
    LspBaseBreakpoint bpt = break_ids.get(id);
@@ -509,7 +655,7 @@ void handleBreakpointEvent(JSONObject body)
       bpt = LspBaseBreakpoint.createBreakpoint(jbpt);
       if (bpt == null) return;
     }
-   
+
    if (reason.equals("REMOVE")) {
       break_map.remove(bpt.getId());
       break_ids.remove(id);
@@ -517,16 +663,16 @@ void handleBreakpointEvent(JSONObject body)
    else {
       LspBaseBreakpoint obpt = break_map.get(bpt.getId());
       if (obpt == null) {
-         reason = "ADD";
+	 reason = "ADD";
        }
       else if (obpt != bpt) {
-         obpt.setProtoInfo(jbpt);
-         break_ids.put(id,obpt);
-         bpt = obpt;
-         reason = "CHANGE";
+	 obpt.setProtoInfo(jbpt);
+	 break_ids.put(id,obpt);
+	 bpt = obpt;
+	 reason = "CHANGE";
        }
     }
-   
+
    handleBreakNotify(bpt,reason);
 }
 
@@ -538,7 +684,7 @@ void clearLineBreakpoints(String proj,String file,int line)
    LspBaseFile nf = null;
    if (file != null) nf = lsp_base.getFileData(proj,file);
    LspLog.logD("DEBUG: CLEAR BPTS " + file + " " + line + " " + nf);
-   
+
    Set<LspBaseFile> updates = new HashSet<>();
    for (Iterator<LspBaseBreakpoint> it = break_map.values().iterator(); it.hasNext(); ) {
       LspBaseBreakpoint bp = it.next();
@@ -547,19 +693,19 @@ void clearLineBreakpoints(String proj,String file,int line)
 	    if (line <= 0 || line == bp.getLine()) {
 	       it.remove();
 	       handleBreakNotify(bp,"REMOVE");
-               updates.add(bp.getFile());
+	       updates.add(bp.getFile());
 	     }
 	  }
        }
     }
    if (!updates.isEmpty()) {
       for (LspBaseFile lbf : updates) {
-         try {
-            updateBreakpointsForFile(lbf);
-          }
-         catch (LspBaseException e) {
-            LspLog.logE("DEBUG problem clearing breakpoints",e);
-          }
+	 try {
+	    updateBreakpointsForFile(lbf);
+	  }
+	 catch (LspBaseException e) {
+	    LspLog.logE("DEBUG problem clearing breakpoints",e);
+	  }
        }
       saveBreakpoints();
     }
@@ -572,7 +718,7 @@ private void loadBreakpoints()
    Element xml = IvyXml.loadXmlFromFile(break_file);
    if (xml == null) {
       exception_breakpoint = LspBaseBreakpoint.createExceptionBreakpoint(null,null,
-            false,true);
+	    false,true);
       break_map.put(exception_breakpoint.getId(),exception_breakpoint);
     }
    else {
@@ -605,8 +751,8 @@ private void loadBreakpoints()
 		     if (prev.getType() == BreakType.LINE &&
 			   prev.getFile().equals(pb.getFile()) &&
 			   prev.getLine() == pb.getLine()) {
-                        pb = null;
-                        break;
+			pb = null;
+			break;
 		      }
 		   }
 		  break;
@@ -662,9 +808,9 @@ void updateAllBreakpoints(LspBaseDebugProtocol proto)
    for (LspBaseBreakpoint pb : break_map.values()) {
       LspBaseFile lbf = pb.getFile();
       if (lbf != null) {
-         if (lbf.getLanguageData() == proto.getLanguage()) {
-            files.add(lbf);
-          }
+	 if (lbf.getLanguageData() == proto.getLanguage()) {
+	    files.add(lbf);
+	  }
        }
     }
    for (LspBaseFile lbf : files) {
@@ -682,27 +828,27 @@ private void updateBreakpointsForFile(LspBaseFile lbf) throws LspBaseException
    List<LspBaseBreakpoint> use = new ArrayList<>();
    for (LspBaseBreakpoint bp : break_map.values()) {
       if (bp.getFile() == lbf && bp.getType() == BreakType.LINE) {
-         LineCol lc = bp.getLineColumn();
-         JSONObject jbpt = createJson("line",lc.getLine(),"column",lc.getColumn());
-//       JSONObject jbpt = createJson("line",lc.getLine());
-         if (bp.getCondition() != null) {
-            jbpt.put("condition",bp.getCondition());
-          }
-         if (bp.getHitCondition() != null) {
-            jbpt.put("hitCondition",bp.getHitCondition());
-          }
-          if (bp.getTraceLog() != null) {
-             jbpt.put("logMessage",bp.getTraceLog());
-           } 
-          use.add(bp);
-          bpts.put(jbpt);
+	 LineCol lc = bp.getLineColumn();
+	 JSONObject jbpt = createJson("line",lc.getLine(),"column",lc.getColumn());
+//	 JSONObject jbpt = createJson("line",lc.getLine());
+	 if (bp.getCondition() != null) {
+	    jbpt.put("condition",bp.getCondition());
+	  }
+	 if (bp.getHitCondition() != null) {
+	    jbpt.put("hitCondition",bp.getHitCondition());
+	  }
+	  if (bp.getTraceLog() != null) {
+	     jbpt.put("logMessage",bp.getTraceLog());
+	   }
+	  use.add(bp);
+	  bpts.put(jbpt);
        }
     }
    for (LspBaseDebugProtocol proto : debug_protocols.values()) {
       if (proto.getLanguage() == lbf.getLanguageData()) {
-         BreakpointsSet setter = new BreakpointsSet(use);
-         proto.sendEarlyRequest("setBreakpoints",setter,
-               "source",src,"breakpoints",bpts,"sourceModified",true);
+	 BreakpointsSet setter = new BreakpointsSet(use);
+	 proto.sendEarlyRequest("setBreakpoints",setter,
+	       "source",src,"breakpoints",bpts,"sourceModified",true);
        }
     }
 }
@@ -714,82 +860,82 @@ private void updateExceptionBreakpoints(LspBaseProject proj)
 {
    for (LspBaseDebugProtocol proto : debug_protocols.values()) {
       if (proj == null || proj.getLanguageData() == proto.getLanguage()) {
-         updateExceptionBreakpoints(proto);
+	 updateExceptionBreakpoints(proto);
        }
     }
 }
 
 
-private void updateExceptionBreakpoints(LspBaseDebugProtocol proto) 
+private void updateExceptionBreakpoints(LspBaseDebugProtocol proto)
       throws LspBaseException
 {
    JSONArray filters = new JSONArray();
    JSONArray exceptopts = new JSONArray();
-   
+
    LspBaseLanguageData ld = proto.getLanguage();
-   String filtercp = "debug.exceptionBreakpoints.filter.";
-   
+   String filtercp = "lsp.exceptionBreakpoints.filter.";
+
    List<LspBaseBreakpoint> use = new ArrayList<>();
    for (LspBaseBreakpoint bp : break_map.values()) {
       if (bp.getType() == BreakType.EXCEPTION) {
-         String filter = null;
-         String mode = null;
-         if (bp.isCaught() && bp.isUncaught()) {
-            filter = ld.getCapabilityString(filtercp + "always");
-            mode = "always";
-          }
-         else if (bp.isUncaught()) {
-            filter = ld.getCapabilityString(filtercp + "uncaught");
-            mode = "userUnhandled";
-          }
-         else if (bp.isCaught()) {
-            filter = ld.getCapabilityString(filtercp + "caught");
-            mode = "always";
-          }
-         if (filter == null || mode == null) continue;
-         
-         JSONObject exceptopt = createJson("breakMode",mode);
-         String except = bp.getException();
-         if (except != null) {
-            JSONArray names = new JSONArray();
-            names.put(except);
-            exceptopt.put("path",createJson("names",names));
-          }
-         filters.put(filter);
-         exceptopts.put(exceptopt);
-         use.add(bp);
+	 String filter = null;
+	 String mode = null;
+	 if (bp.isCaught() && bp.isUncaught()) {
+	    filter = ld.getCapabilityString(filtercp + "always");
+	    mode = "always";
+	  }
+	 else if (bp.isUncaught()) {
+	    filter = ld.getCapabilityString(filtercp + "uncaught");
+	    mode = "userUnhandled";
+	  }
+	 else if (bp.isCaught()) {
+	    filter = ld.getCapabilityString(filtercp + "caught");
+	    mode = "always";
+	  }
+	 if (filter == null || mode == null) continue;
+
+	 JSONObject exceptopt = createJson("breakMode",mode);
+	 String except = bp.getException();
+	 if (except != null) {
+	    JSONArray names = new JSONArray();
+	    names.put(except);
+	    exceptopt.put("path",createJson("names",names));
+	  }
+	 filters.put(filter);
+	 exceptopts.put(exceptopt);
+	 use.add(bp);
        }
     }
-   
+
    if (use.isEmpty()) return;
-   
+
    BreakpointsSet setter = new BreakpointsSet(use);
    proto.sendEarlyRequest("setExceptionBreakpoints",setter,
-         "filters",filters,"exceptionOptions",exceptopts);
+	 "filters",filters,"exceptionOptions",exceptopts);
 }
 
 
 
 private class BreakpointsSet implements LspJsonResponder {
-   
+
    private List<LspBaseBreakpoint> break_points;
-   
+
    BreakpointsSet(List<LspBaseBreakpoint> bpts) {
       break_points = bpts;
     }
-   
+
    @Override public void handleResponse(JSONObject data) {
       JSONArray bpts = data.optJSONArray("breakpoints");
       if (bpts != null) {
-         for (int i = 0; i < break_points.size(); ++i) {
-            JSONObject jdata = bpts.getJSONObject(i);
-            LspBaseBreakpoint bp = break_points.get(i);
-            LspLog.logD("Debug: SET BREAK DATA " + bp + " " + jdata.toString(2));
-            bp.setProtoInfo(jdata);
-            if (bp.getExternalId() > 0) {
-               break_ids.put(bp.getExternalId(),bp);
-             }
-          }
+	 for (int i = 0; i < break_points.size(); ++i) {
+	    JSONObject jdata = bpts.getJSONObject(i);
+	    LspBaseBreakpoint bp = break_points.get(i);
+	    LspLog.logD("Debug: SET BREAK DATA " + bp + " " + jdata.toString(2));
+	    bp.setProtoInfo(jdata);
+	    if (bp.getExternalId() > 0) {
+	       break_ids.put(bp.getExternalId(),bp);
+	     }
+	  }
        }
     }
 }
@@ -806,12 +952,12 @@ void runProject(String configid,IvyXmlWriter xw) throws LspBaseException
 {
    LspBaseLaunchConfig cfg = config_map.get(configid);
    if (cfg == null) throw new LspBaseException("Configuration not found");
-   
+
    LspBaseDebugTarget tgt = new LspBaseDebugTarget(this,cfg);
    tgt.startDebug();
-   
+
    target_map.put(Integer.toString(tgt.getId()),tgt);
-   
+
    xw.begin("LAUNCH");
    xw.field("MODE","debug");
    xw.field("ID",tgt.getId());
@@ -835,7 +981,7 @@ void debugAction(String launchid,String targetid,
 }
 
 
-private boolean matchLaunch(String id,LspBaseDebugTarget tgt) 
+private boolean matchLaunch(String id,LspBaseDebugTarget tgt)
 {
    if (id == null || id.equals("*")) return true;
    int tid = Integer.parseInt(id);
@@ -846,7 +992,7 @@ private boolean matchLaunch(String id,LspBaseDebugTarget tgt)
 
 void consoleInput(String launch,String input)
 {
-   
+
 }
 
 
@@ -864,11 +1010,11 @@ void getStackFrames(String launchid,int tid,int count,int depth,int arrsz,IvyXml
    int lid = 0;
    if (launchid != null) {
       try {
-         lid = Integer.parseInt(launchid);
+	 lid = Integer.parseInt(launchid);
        }
       catch (NumberFormatException e) { }
     }
-    
+
    xw.begin("STACKFRAMES");
    for (LspBaseDebugTarget tgt : target_map.values()) {
       if (launchid != null && tgt.getId() != lid) continue;
@@ -884,9 +1030,9 @@ void getVariableValue(String thread,String frame,String var,int saveid,int depth
 {
    for (LspBaseDebugTarget tgt : target_map.values()) {
       tgt.getVariableValue(thread,frame,var,saveid,depth,arr,
-            detail,xw);
+	    detail,xw);
     }
-   
+
 }
 
 
@@ -901,27 +1047,27 @@ void evaluateExpression(String proj,String bid,String expr,int thread,
    if (frame != null) {
       fidx = Integer.parseInt(frame);
     }
-   
+
    // need to do this in background if eid is not null
-   
+
    for (LspBaseDebugTarget tgt : target_map.values()) {
       LspBaseDebugThread thrd = tgt.findThreadById(thread);
       if (thrd != null) {
 	 for (LspBaseDebugStackFrame frm : thrd.getStackFrames()) {
 	    if (frm == null) continue;
 	    if (fidx < 0 || fidx == frm.getIndex()) {
-               LspBaseMain lsp = LspBaseMain.getLspMain();
-               IvyXmlWriter msg  = lsp.beginMessage("EVALUATION",bid);
-               msg.field("ID",eid);
-               ExprEvaluator ee = new ExprEvaluator(frm,expr,msg);
-               lsp.startTask(ee);
+	       LspBaseMain lsp = LspBaseMain.getLspMain();
+	       IvyXmlWriter msg  = lsp.beginMessage("EVALUATION",bid);
+	       msg.field("ID",eid);
+	       ExprEvaluator ee = new ExprEvaluator(frm,expr,msg);
+	       lsp.startTask(ee);
 	       return;
 	     }
 	  }
        }
       if (done) break;
     }
-   
+
    if (!done) throw new LspBaseException("No evaluation to do");
 }
 
@@ -931,27 +1077,27 @@ private class ExprEvaluator implements Runnable {
    LspBaseDebugStackFrame for_frame;
    String eval_expr;
    IvyXmlWriter xml_writer;
-   
+
    ExprEvaluator(LspBaseDebugStackFrame frm,String expr,IvyXmlWriter msg) {
       for_frame = frm;
       eval_expr = expr;
       xml_writer = msg;
     }
-   
+
    @Override public void run() {
       LspBaseMain lsp = LspBaseMain.getLspMain();
       try {
-         LspBaseDebugVariable rslt = for_frame.evaluateExpression(eval_expr);
-         xml_writer.field("SAVEID",rslt.getReference());
-         rslt.outputValue(xml_writer);
+	 LspBaseDebugVariable rslt = for_frame.evaluateExpression(eval_expr);
+	 xml_writer.field("SAVEID",rslt.getReference());
+	 rslt.outputValue(xml_writer);
        }
       catch (LspBaseException e) {
-         LspLog.logE("DEBUG evaluation problem",e);
+	 LspLog.logE("DEBUG evaluation problem",e);
        }
       lsp.finishMessage(xml_writer);
     }
-   
-}       // end of inner class ExprEvaluator
+
+}	// end of inner class ExprEvaluator
 
 
 
@@ -1011,7 +1157,7 @@ private void saveConfigurations()
 
 
 
-}       // end of class LspBaseDebugManager
+}	// end of class LspBaseDebugManager
 
 
 

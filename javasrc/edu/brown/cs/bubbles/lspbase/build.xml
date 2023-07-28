@@ -57,6 +57,7 @@
       <jar destfile='lspbase.jar'>
 	 <fileset dir='${LSPBASE}/java' includes='**/*.class' />
 	 <fileset dir='${LSPBASE}/resources' includes='*.json' />
+	 <fileset dir='${LSPBASE}/resources' includes='*.xml' />
       </jar>
       <copy file='lspbase.jar' tofile='${BUBBLES}/lib/lspbase.jar' />
    </target>

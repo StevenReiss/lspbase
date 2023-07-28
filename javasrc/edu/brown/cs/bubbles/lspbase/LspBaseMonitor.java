@@ -252,6 +252,9 @@ private String handleCommand(String cmd,String proj,Element xml) throws LspBaseE
       case "FORMATCODE" :
          lsp_base.getProjectManager().handleEditCommand(cmd,proj,xml,xw);
          break;
+      case "LAUNCHES" :
+      case "LANGUAGEDATA" :
+      case "LAUNCHQUERY" :
       case "GETRUNCONFIG" :
       case "NEWRUNCONFIG" :
       case "EDITRUNCONFIG" :

@@ -94,10 +94,10 @@ LspBaseDebugTarget(LspBaseDebugManager mgr,LspBaseLaunchConfig config)
    
    debug_protocol = debug_manager.getDebugProtocol(this);
    LspBaseLanguageData ld = debug_protocol.getLanguage();
-   local_scopes = ld.getCapabilitySet("localScopes");
-   class_scopes = ld.getCapabilitySet("classScopes");
-   primitive_types = ld.getCapabilitySet("primitiveTypes");
-   string_types = ld.getCapabilitySet("stringTypes");
+   local_scopes = ld.getCapabilitySet("lsp.localScopes");
+   class_scopes = ld.getCapabilitySet("lsp.classScopes");
+   primitive_types = ld.getCapabilitySet("lsp.primitiveTypes");
+   string_types = ld.getCapabilitySet("lsp.stringTypes");
 }
 
 

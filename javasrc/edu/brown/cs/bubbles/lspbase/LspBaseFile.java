@@ -436,7 +436,7 @@ JSONArray getSymbols()
       catch (LspBaseException e) {
          LspLog.logE("Problem getting document symbols",e);
        }
-      if (for_project.getLanguageData().getCapabilityBool("fileModule")) {
+      if (for_project.getLanguageData().getCapabilityBool("lsp.fileModule")) {
 	 String nm = for_file.getName();
 	 int idx = nm.lastIndexOf(".");
 	 if (idx > 0) nm = nm.substring(0,idx);

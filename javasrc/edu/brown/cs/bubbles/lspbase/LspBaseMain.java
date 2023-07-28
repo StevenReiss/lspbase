@@ -284,9 +284,9 @@ LspBaseProtocol findProtocol(File ws,String lang,List<LspBasePathSpec> paths)
    LspBaseProtocol proto = null;
 
    synchronized (workspace_protocols) {
-      proto = workspace_protocols.get(ws);
+      if (ws != null) proto = workspace_protocols.get(ws);
       if (proto != null) return proto;
-
+      
       LspBaseLanguageData ld = exec_map.get(lang);
       if (ld == null) return null;
       if (!ld.isSingleWorkspace()) {
@@ -297,7 +297,7 @@ LspBaseProtocol findProtocol(File ws,String lang,List<LspBasePathSpec> paths)
 	  }
        }
       proto = new LspBaseProtocol(ws,paths,ld);
-      if (ld.isSingleWorkspace()) active_protocols.put(lang,proto);
+      active_protocols.put(lang,proto);
       workspace_protocols.put(ws,proto);
       if (ld.isSingleWorkspace()) {
          try {
@@ -311,6 +311,17 @@ LspBaseProtocol findProtocol(File ws,String lang,List<LspBasePathSpec> paths)
     }
 
    return proto;
+}
+
+
+LspBaseLanguageData getBaseLanguage()
+{
+   for (String lang : active_protocols.keySet()) {
+      LspBaseLanguageData ld = getLanguageData(lang);
+      if (ld != null) return ld;
+    }
+   
+   return null;
 }
 
 

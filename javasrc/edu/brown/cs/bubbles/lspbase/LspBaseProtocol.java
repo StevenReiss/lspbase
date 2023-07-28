@@ -99,7 +99,7 @@ LspBaseProtocol(File workspace,List<LspBasePathSpec> paths,LspBaseLanguageData l
    config_data = null;
    try {
       config_data = new JSONObject(json);
-      for_language.setCapabilities(config_data.getJSONObject("lspbaseConfiguration"));
+      for_language.setCapabilities("lsp",config_data.getJSONObject("lspbaseConfiguration"));
       for_language.setDebugConfiguration(config_data.getJSONObject("debugConfiguration"));
     }
    catch (Throwable e) {
@@ -243,7 +243,7 @@ void initialize() throws LspBaseException
 private void handleInit(JSONObject init)
 {
    JSONObject scaps = init.getJSONObject("capabilities");
-   for_language.setCapabilities(scaps);
+   for_language.setCapabilities(null,scaps);
 }
 
 
@@ -458,7 +458,7 @@ private void localDoSendMessage(String method,LspResponder resp,boolean wait,JSO
 	    catch (InterruptedException e) { }
 	  }
          err = error_map.remove(id);
-         if (err.equals("")) err = null;
+         if (err != null && err.equals("")) err = null;
        }
     }
    
@@ -768,38 +768,38 @@ private class MessageReader extends Thread {
    @Override public void run() {
       int clen = -1;
       for ( ; ; ) {
-	 try {
-	    String ln = readline();
-	    if (ln == null) break;
-	    if (ln.length() == 0) {
-	       if (clen > 0) {
-		  byte [] buf = new byte[clen];
-		  int rln = 0;
-		  while (rln < clen) {
-		     int mln = message_input.read(buf,rln,clen-rln);
-		     rln += mln;
-		   }
-		  String rslt = new String(buf,0,rln);
-		  JSONObject jobj = new JSONObject(rslt);
+         try {
+            String ln = readline();
+            if (ln == null) break;
+            if (ln.length() == 0) {
+               if (clen > 0) {
+                  byte [] buf = new byte[clen];
+                  int rln = 0;
+                  while (rln < clen) {
+                     int mln = message_input.read(buf,rln,clen-rln);
+                     rln += mln;
+                   }
+                  String rslt = new String(buf,0,rln);
+                  JSONObject jobj = new JSONObject(rslt);
    //		  LspLog.logD("Received: " + clen + " " + rln + "::\n" + jobj.toString(2));
-		  process(jobj);
-		  clen = -1;
-		}
-	     }
-	    else {
-	       int idx = ln.indexOf(":");
-	       if (idx >= 0) {
-		  String key = ln.substring(0,idx).trim();
-		  String val = ln.substring(idx+1).trim();
-		  if (key.equalsIgnoreCase("Content-Length")) {
-		     clen = Integer.parseInt(val);
-		   }
-		}
-	     }
-	  }
-	 catch (IOException e) { }
+                  process(jobj);
+                  clen = -1;
+                }
+             }
+            else {
+               int idx = ln.indexOf(":");
+               if (idx >= 0) {
+                  String key = ln.substring(0,idx).trim();
+                  String val = ln.substring(idx+1).trim();
+                  if (key.equalsIgnoreCase("Content-Length")) {
+                     clen = Integer.parseInt(val);
+                   }
+                }
+             }
+          }
+         catch (IOException e) { }
        }
-    }
+   }
 
    String readline() throws IOException {
       byte [] buf = new byte[10000];

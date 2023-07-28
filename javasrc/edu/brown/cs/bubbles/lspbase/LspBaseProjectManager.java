@@ -109,9 +109,16 @@ LspBasePathSpec createPathSpec(File src,boolean user,boolean exclude,boolean nes
 LspBaseProject findProject(String proj) throws LspBaseException
 {
    if (proj == null) return null;
+   if (proj.equals("*")) {
+      for (LspBaseProject lp : all_projects.values()) {
+         return lp;
+       }
+    }
 
    LspBaseProject pp = all_projects.get(proj);
-   if (pp == null) throw new LspBaseException("Unknown project " + proj);
+   if (pp == null) {
+      throw new LspBaseException("Unknown project " + proj);
+    }
 
    return pp;
 }
@@ -273,7 +280,7 @@ void handleCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
 	       IvyXml.getAttrString(xml,"BACKGROUND"),xw);
 	 break;
       case "PREFERENCES" :
-	 handlePreferences(proj,xw);
+	 handlePreferences(proj,IvyXml.getAttrString(xml,"LANG"),xw);
 	 break;
       case "SETPREFERENCES" :
 	 Element pxml = IvyXml.getChild(xml,"profile");
@@ -927,19 +934,52 @@ void handleFindPackage(String proj,String name,IvyXmlWriter xw)
 /*										*/
 /********************************************************************************/
 
-void handlePreferences(String proj,IvyXmlWriter xw)
+void handlePreferences(String proj,String lang,IvyXmlWriter xw)
    throws LspBaseException					
 {
    LspBasePreferences opts;
    if (proj == null) {
       opts = system_preferences;
+      if (lang != null) {
+         forAllProjects(null,this::ensureInitialized);
+         LspBaseMain lsp = LspBaseMain.getLspMain();
+         if (lang.endsWith("Lsp")) {
+            lang = lang.substring(0,lang.length()-3);
+          }
+         lang = lang.toLowerCase();
+         LspBaseLanguageData ld = lsp.getLanguageData(lang);
+         opts = addLanguageOptions(opts,ld);
+       }
     }
    else {
       LspBaseProject lspproj = findProject(proj);
+      ensureInitialized(lspproj);
       opts = lspproj.getPreferences();
+      opts = addLanguageOptions(opts,lspproj.getLanguageData());
     }
 
    opts.dumpPreferences(xw);
+}
+
+
+private LspBasePreferences addLanguageOptions(LspBasePreferences opts,LspBaseLanguageData ld)
+{
+   if (ld != null) {
+      opts = new LspBasePreferences(opts);
+      ld.addPreferences("lspbase",opts);
+      opts.setProperty("LaunchConfigurations","lspbase.lsp.launchConfigurations");
+    }
+   
+   return opts;
+}
+
+
+void ensureInitialized(LspBaseProject p) 
+{
+   try {
+      p.getProtocol().initialize();
+    }
+   catch (LspBaseException e) { }
 }
 
 

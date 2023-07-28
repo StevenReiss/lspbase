@@ -381,10 +381,64 @@
      "classScopes" : [ "Class" ],
      "primitiveTypes" : [ "int", "number", "bool", "double" ],
      "stringTypes" : [ "String" ],
-     "launchConfiguration" : {
-	"attributes" : [ "PROJECT_ATTR","PROGRAM_ARGUMENTS","VM_ARGUMENTS", "MAIN_TYPE",
-			 "WORKING_DIRECTORY", "NAME", "FILE", "DEBUG_LIBRARIES", "TOOL_ARGS" ,
-			 "CAPTURE_IN_FILE", "DEVICE" ]
-      }
+     "launchConfigurations" : [
+	{
+	  "name" : "DART",
+	  "display" : "Dart Program",
+	  "attributes" : [
+	    {
+	      "name" : "FILE",
+	      "description" : "File to Run",
+	      "type" : "START"
+	    },
+	    {
+	      "name" : "PROGRAM_ARGUMENTS",
+	      "description" : "Arguments",
+	      "type" : "LONG_STRING"
+	    },
+	    {
+	      "name" : "VM_ARGUMENTS",
+	      "description" : "VM Arguments",
+	      "type" : "STRING"
+	    },
+	    {
+	      "name" : "DEBUG_LIBRARIES",
+	      "description" : "Debug in Libraries",
+	      "type" : "BOOLEAN"
+	    }
+	  ]
+	},
+	{
+	  "name" : "FLUTTER",
+	  "display" : "Flutter Program",
+	  "attributes" : [
+	    {
+	      "name" : "FILE",
+	      "description" : "File to Run",
+	      "type" : "START"
+	    },
+	    {
+	      "name" : "DEVICE",
+	      "description" : "Output Device",
+	      "type" : "DEVICE"
+	    },
+	    {
+	      "name" : "PROGRAM_ARGUMENTS",
+	      "description" : "Program Arguments",
+	      "type" : "LONG_STRING"
+	    },
+	    {
+	      "name" : "VM_ARGUMENTS",
+	      "description" : "VM Arguments",
+	      "type" : "STRING"
+	    },
+	    {
+	      "name" : "DEBUG_LIBRARIES",
+	      "description" : "Debug in Libraries",
+	      "type" : "BOOLEAN"
+	    }
+	  ]
+	}
+      ]
     }
 }

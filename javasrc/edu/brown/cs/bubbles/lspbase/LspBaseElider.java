@@ -117,13 +117,13 @@ LspBaseElider(LspBaseFile file)
     }
    
    LspBaseLanguageData lld = file.getLanguageData();
-   scan_braces = lld.getCapabilityBool("elision.scanBraces");
-   scan_calls = lld.getCapabilityBool("elision.scanCalls");
-   slashslash_comments = lld.getCapabilityBool("elision.slashslashComments");
-   slashstar_comments = lld.getCapabilityBool("elision.slashstarComments");
-   pound_comments = lld.getCapabilityBool("elision.poundComments");
-   text_blocks = lld.getCapabilityBool("elision.textBlocks");
-   backquote_blocks = lld.getCapabilityBool("elision.backquoteBlocks");
+   scan_braces = lld.getCapabilityBool("lsp.elision.scanBraces");
+   scan_calls = lld.getCapabilityBool("lsp.elision.scanCalls");
+   slashslash_comments = lld.getCapabilityBool("lsp.elision.slashslashComments");
+   slashstar_comments = lld.getCapabilityBool("lsp.elision.slashstarComments");
+   pound_comments = lld.getCapabilityBool("lsp.elision.poundComments");
+   text_blocks = lld.getCapabilityBool("lsp.elision.textBlocks");
+   backquote_blocks = lld.getCapabilityBool("lsp.elision.backquoteBlocks");
 }
 
 

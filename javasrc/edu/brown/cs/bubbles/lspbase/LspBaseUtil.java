@@ -104,7 +104,7 @@ private static void outputSymbol(LspBaseProject project,LspBaseFile file,JSONObj
    String det = sym.optString("detail",null);
    if (det != null) {
       LspBaseLanguageData ldata = project.getLanguageData();
-      if (ldata.getCapabilityBool("useParameters")) {
+      if (ldata.getCapabilityBool("lsp.useParameters")) {
          xw.field("PARAMETERS",det);
        }
       else {
@@ -119,7 +119,7 @@ private static void outputSymbol(LspBaseProject project,LspBaseFile file,JSONObj
    
    int fgs = 0;
    LspBaseLanguageData ld = file.getLanguageData();
-   String ppfx = ld.getCapabilityString("privatePrefix");
+   String ppfx = ld.getCapabilityString("lsp.privatePrefix");
    if (ppfx != null && nm.startsWith(ppfx)) {
       xw.field("FLAGS",Modifier.PRIVATE);
     }

@@ -97,11 +97,6 @@ void setDebugConfiguration(JSONObject cfg)      { dap_configuration = cfg; }
 /*                                                                              */
 /********************************************************************************/
 
-void setCapabilities(JSONObject caps) 
-{
-   setCapabilities(null,caps);
-}
-
 void setCapabilities(String pfx,JSONObject caps)
 {
    addJsonCapabilities(pfx,caps);
@@ -215,6 +210,48 @@ Set<String> getCapabilityStrings(String key)
     }
    
    return rslt;
+}
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Output capabilities as preferences                                      */
+/*                                                                              */
+/********************************************************************************/
+
+void addPreferences(String pfx,LspBasePreferences prefs)
+{
+   if (pfx == null) pfx = "";
+   else if (!pfx.endsWith(".")) pfx += ".";
+   
+   for (Map.Entry<String,Object> ent : server_capabilities.entrySet()) {
+      String vkey = pfx + ent.getKey();
+      Object val = ent.getValue();
+      addPreference(vkey,val,prefs);
+    }
+}
+
+
+void addPreference(String pfx,Object val,LspBasePreferences prefs)
+{
+   if (val instanceof JSONObject) {
+      JSONObject jval = (JSONObject) val;
+      for (String key : jval.keySet()) {
+         String vkey = (pfx == null ? key : pfx + "." + key);
+         addPreference(vkey,jval.get(key),prefs);
+       }
+    }
+   else if (val instanceof JSONArray) {
+      JSONArray aval = (JSONArray) val;
+      for (int i = 0; i < aval.length(); ++i) {
+         String akey = (pfx == null ? "" + i : pfx + "." + i);
+         addPreference(akey,aval.get(i),prefs);
+       }
+    }
+   else {
+      prefs.setProperty(pfx,val.toString());
+    }
 }
 
 
