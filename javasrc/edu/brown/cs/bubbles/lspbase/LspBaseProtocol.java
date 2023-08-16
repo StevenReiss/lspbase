@@ -140,7 +140,7 @@ void addWorkspace(File ws,List<LspBasePathSpec> paths) {
    List<File> sources = new ArrayList<>();
 
    for (LspBasePathSpec path : paths) {
-      if (path.isExclude() || !path.isUser()) continue;
+      if (!path.isUser()) continue;
       File f = path.getFile();
       if (!source_roots.contains(f)) {
 	 sources.add(f);
@@ -619,10 +619,9 @@ Object handleWorkspaceConfiguration(int id,JSONObject params)
 	 File ws = pathWorkspaceMap.get(scp);
 	 if (ws != null) {
 	    for (LspBasePathSpec lbps : workspacePathMap.get(ws)) {
-	       if (lbps.isExclude()) {
-		  String path = lbps.getFile().getPath();
-		  exclude.put(path);
-		}
+               for (String s: lbps.getExcludes()) {
+                  exclude.put(s);
+                }
 	     }
 	  }
        }

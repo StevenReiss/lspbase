@@ -24,10 +24,12 @@ package edu.brown.cs.bubbles.lspbase;
 
 import java.io.File;
 import java.io.FileFilter;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -35,7 +37,9 @@ import java.util.Set;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.w3c.dom.Element;
+import org.yaml.snakeyaml.Yaml;
 
+import edu.brown.cs.ivy.exec.IvyExec;
 import edu.brown.cs.ivy.file.IvyFile;
 import edu.brown.cs.ivy.xml.IvyXml;
 import edu.brown.cs.ivy.xml.IvyXmlWriter;
@@ -62,6 +66,7 @@ private boolean 	is_open;
 private LspBaseProtocol use_protocol;
 private LspBasePreferences project_preferences;
 private Map<String,EditParameters> edit_parameters;
+private Set<String> project_references;
 
 
 
@@ -84,6 +89,7 @@ LspBaseProject(LspBaseMain lm,LspBaseProjectManager pm,String name,File base)
    file_map = new HashMap<>();
    project_preferences = new LspBasePreferences(pm.getSystemPreferences());
    edit_parameters = new HashMap<>();
+   project_references = new HashSet<>();
 
    File f = new File(base_directory,".bubbles");
    if (!f.exists()) f.mkdir();
@@ -101,6 +107,9 @@ LspBaseProject(LspBaseMain lm,LspBaseProjectManager pm,String name,File base)
 	 File fs = new File(nm);
 	 addLspFile(fs,false);
        }
+      for (Element re : IvyXml.children(xml,"REFERENCES")) {
+         project_references.add(IvyXml.getAttrString(re,"NAME"));
+       }
       project_preferences.loadXml(xml);
     }
    is_open = false;
@@ -108,6 +117,7 @@ LspBaseProject(LspBaseMain lm,LspBaseProjectManager pm,String name,File base)
 // use_protocol = lsp_base.findProtocol(base_directory,project_language);
    saveProject();
 }
+
 
 
 /********************************************************************************/
@@ -128,8 +138,30 @@ File getBasePath()				{ return base_directory; }
 boolean isOpen()				{ return is_open; }
 boolean exists()				{ return base_directory.exists(); }
 
-LspBaseProject [] getReferencedProjects()	{ return new LspBaseProject[0]; }
-LspBaseProject [] getReferencingProjects()	{ return new LspBaseProject[0]; }
+List<LspBaseProject> getReferencedProjects()	
+{ 
+   List<LspBaseProject> rslt = new ArrayList<>();
+   for (String s : project_references) {
+      try {
+         LspBaseProject bp = project_manager.findProject(s);
+         if (bp != null) rslt.add(bp);
+       }
+      catch (LspBaseException e) { }
+    }
+   return rslt;
+}
+
+List<LspBaseProject> getReferencingProjects()
+{ 
+   List<LspBaseProject> rslt = new ArrayList<>();
+   for (LspBaseProject bp : project_manager.getAllProjects()) {
+      if (bp == this) continue;
+      if (bp.project_references.contains(project_name)) {
+         rslt.add(bp);
+       }
+    }
+   return rslt;
+}
 
 LspBasePreferences getPreferences()		{ return project_preferences; }
 
@@ -171,7 +203,7 @@ String getRelativeFile(LspBaseFile f)
    String p0 = IvyFile.getCanonicalPath(f.getFile());
 
    for (LspBasePathSpec ps : project_paths) {
-      if (ps.isUser() && !ps.isExclude()) {
+      if (ps.isUser()) {
 	 File dir = ps.getFile();
 	 File dir1 = getUserSourceDirectory(dir);
 	 if (dir1 == null) continue;
@@ -201,13 +233,15 @@ void open() throws LspBaseException
    if (use_protocol == null) {
       use_protocol = lsp_base.findProtocol(base_directory,project_language,project_paths);
     }
-
+   
+   addLibraries();
+   
    for (LspBasePathSpec ps : project_paths) {
-      if (ps.isUser() && !ps.isExclude()) {
+      if (ps.isUser()) {
 	 File dir = ps.getFile();
 	 File dir1 = getUserSourceDirectory(dir);
 	 if (dir1 != null) {
-	    findFiles(null,dir1,false);
+	    findFiles(ps,null,dir1,false);
 	  }
        }
     }
@@ -235,17 +269,10 @@ private File getUserSourceDirectory(File dir)
 
 
 
-protected void findFiles(String pfx,File f,boolean reload)
+protected void findFiles(LspBasePathSpec spec,String pfx,File f,boolean reload)
 {
-   boolean nest = true;
-   for (LspBasePathSpec ps : project_paths) {
-      if (!ps.isUser() || ps.isExclude()) {
-	 if (ps.match(f)) return;
-       }
-      if (!ps.isNested()) {
-	 if (ps.match(f)) nest = false;
-       }
-    }
+   boolean nest = spec.isNested() || f.equals(spec.getFile());
+   if (!spec.useFile(f)) return;
 
    FileFilter filter = lsp_base.getLanguageData(project_language).getSourceFilter();
 
@@ -255,7 +282,7 @@ protected void findFiles(String pfx,File f,boolean reload)
       if (pfx != null) npfx = pfx + "." + f.getName();
       for (File f1 : fls) {
 	 if (!nest && f1.isDirectory()) continue;
-	 findFiles(npfx,f1,reload);
+	 findFiles(spec,npfx,f1,reload);
        }
       return;
     }
@@ -286,6 +313,201 @@ private LspBaseFile addLspFile(File file,boolean reload)
    return lbf;
 }
 
+
+private void removeLspFile(LspBaseFile oldf)
+{
+   project_files.remove(oldf);
+   for (Iterator<Map.Entry<String,LspBaseFile>> it = file_map.entrySet().iterator(); it.hasNext(); ) {
+      Map.Entry<String,LspBaseFile> ent = it.next();
+      if (ent.getValue() == oldf) it.remove();
+    }
+}
+
+
+private LspBaseFile renameLspFile(LspBaseFile oldf,File file)
+{
+   removeLspFile(oldf);
+   
+   return addLspFile(file,true);
+}
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Library methods                                                         */
+/*                                                                              */
+/********************************************************************************/
+
+@SuppressWarnings("unchecked")
+private void addLibraries()
+{
+   String typ = getLanguageData().getCapabilityString("lsp.projects.library");
+   if (typ == null) return;
+   List<LspBasePathSpec> toadd = new ArrayList<>();
+   for (LspBasePathSpec path : project_paths) {
+      if (!path.isUser()) continue;
+      File f1 = path.getFile();
+      File f2 = null;
+      switch (typ) {
+         case "pubspec.yaml" :
+            f2 = new File(f1,"pubspec.yaml");
+            if (!f2.exists()) f2 = new File(f1,"pubspec.yml");
+            if (!f2.exists()) continue;
+            try (FileReader fr = new FileReader(f2)) {
+               Yaml yaml = new Yaml();
+               Map<String,Object> r = new HashMap<>();
+               r = yaml.loadAs(fr,Map.class);
+               Map<String,Object> o = (Map<String,Object>) r.get("dependencies");
+               if (o == null) continue;
+               for (String k : o.keySet()) {
+                  Object v = o.get(k);
+                  if (v instanceof String) {
+                     toadd.add(new LspBasePathSpec(k,o.toString()));
+                   }
+                  else if (v instanceof Map<?,?>) {
+                     Map<?,?> m = (Map<?,?>) v;
+                     toadd.add(new LspBasePathSpec(k,m.toString()));
+                   }
+                  else {
+                     System.err.println("DEP " + k + " = " + o.get(k));
+                   }
+                }
+             }
+            catch (IOException e) { }
+            
+            break;
+         case "package.json" :
+            f2 = new File(f1,"package.json");
+            if (!f2.exists()) continue;
+            try {
+               String cnts = IvyFile.loadFile(f2);
+               JSONObject jobj = new JSONObject(cnts);
+               JSONObject dep = jobj.optJSONObject("dependencies");
+               if (dep == null) continue;
+               for (String k : dep.keySet()) {
+                  toadd.add(new LspBasePathSpec(k,dep.get(k).toString()));
+                }
+             }
+            catch (IOException e) { }
+            break;
+         default :
+            continue;
+       }
+    }
+   for (Iterator<LspBasePathSpec> it = toadd.iterator(); it.hasNext(); ) {
+      LspBasePathSpec add = it.next();
+      for (LspBasePathSpec path : project_paths) {
+         if (add.getFile().equals(path.getFile())) {
+            it.remove();
+            break;
+          }
+       }
+    }
+   project_paths.addAll(toadd);
+}
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Editing methods                                                         */
+/*                                                                              */
+/********************************************************************************/
+
+void editProject(Element xml)
+{
+   for (Element pxml : IvyXml.children(xml,"PATH")) {
+      updatePathEntry(pxml);
+    }
+   
+   Set<String> refs = new HashSet<>();
+   Element rxml = IvyXml.getChild(xml,"REFERENCES");
+   for (Element ref : IvyXml.children(rxml,"PROJECT")) {
+      String txt = IvyXml.getText(ref);
+      refs.add(txt);
+    }
+   project_references = refs;
+   
+   project_preferences.setPreferences(xml);
+}
+
+
+private void updatePathEntry(Element pxml)
+{
+   LspBasePathSpec nspec = new LspBasePathSpec(pxml);
+   
+   int id = IvyXml.getAttrInt(pxml,"ID",0);
+   LspBasePathSpec edit = null;
+   if (id != 0) {
+      for (LspBasePathSpec bps : project_paths) {
+         if (bps.getId() == id) {
+            edit = bps;
+            break;
+          }
+       }
+    }
+   else {
+      for (LspBasePathSpec bps : project_paths) {
+         if (bps.getFile().equals(nspec.getFile())) {
+            edit = bps;
+            break;
+          }
+       }
+    }
+   
+   if (IvyXml.getAttrBool(pxml,"DELETE")) {
+      if (edit != null) removePathEntry(edit);
+    }
+   else if (edit != null) {
+      edit.updateFrom(nspec);
+    }
+   else {
+      addPathEntry(nspec);
+    }
+}
+
+
+private void addPathEntry(LspBasePathSpec ps)
+{
+   String typ = getLanguageData().getCapabilityString("lsp.projects.library");
+   String cmd = getLanguageData().getCapabilityString("lsp.projects.libraryAdd");
+   executeLibraryCommand(typ,cmd,ps);
+   
+   project_paths.add(ps);
+}
+
+
+private void removePathEntry(LspBasePathSpec ps)
+{
+   String typ = getLanguageData().getCapabilityString("lsp.projects.library");
+   String cmd = getLanguageData().getCapabilityString("lsp.projects.libraryRemove");
+   executeLibraryCommand(typ,cmd,ps);
+   
+   project_paths.remove(ps);
+}
+
+      
+private void executeLibraryCommand(String typ,String cmd,LspBasePathSpec ps)
+{
+   if (typ == null || cmd == null) return;
+   
+   for (LspBasePathSpec path : project_paths) {
+      if (!path.isUser()) continue;
+      File f1 = path.getFile();
+      File f2 = new File(f1,typ);
+      if (!f2.exists()) continue;
+      Map<String,String> m = new HashMap<>();
+      m.put("LIB",ps.getFile().getPath());
+      String ver = ps.getInfo();
+      if (ver != null) m.put("INFO",ver);
+      String ecmd = IvyFile.expandText(cmd,m);
+      try {
+         IvyExec ex = new IvyExec(ecmd,f1);
+         ex.waitFor();
+       }
+      catch (IOException e) { }
+    }
+}
 
 
 
@@ -415,9 +637,9 @@ void build(boolean refresh,boolean reload)
     }
 
    for (LspBasePathSpec ps : project_paths) {
-      if (ps.isUser() && !ps.isExclude()) {
+      if (ps.isUser()) {
 	 File dir = ps.getFile();
-	 findFiles(null,dir,reload);
+	 findFiles(ps,null,dir,reload);
        }
     }
    
@@ -686,6 +908,80 @@ void findByKey(LspBaseFile lbf,String key,IvyXmlWriter xw)
 
 
 
+/********************************************************************************/
+/*                                                                              */
+/*      Delete and Rename methods                                               */
+/*                                                                              */
+/********************************************************************************/
+
+void handleDeleteResource(String what,String path)
+   throws LspBaseException
+{
+   List<LspBaseFile> files = new ArrayList<>();
+   File ff = null;
+   
+   switch (what) {
+      case "FILE" :
+         ff = new File(what);
+         break;
+      case "PROJECT" :
+         // handled by project manager
+         return;
+      case "PACKAGE" :
+         // TODO: get directory associated with package
+      case "CLASS" :
+         // TODO: should be handled by finding class and deleting inside a file
+         // if the file is all the class, then delete the file
+         break;
+    }
+   
+   if (ff != null) {
+      addFileToDelete(ff,files);
+      if (!files.isEmpty()) {
+         willDeleteFiles(files);
+         for (LspBaseFile lbf : files) {
+            removeLspFile(lbf);
+            lbf.getFile().delete();
+          }
+         didDeleteFiles(files);
+       }
+    }
+}
+
+
+
+private void addFileToDelete(File f,List<LspBaseFile> rslt)
+{
+    if (f.isDirectory()) {
+       for (File f1 : f.listFiles()) {
+          addFileToDelete(f1,rslt);
+        }
+     }
+    else if (getLanguageData().isSourceFile(f)) {
+       LspBaseFile lbf = findFile(f);
+       if (lbf != null) rslt.add(lbf);
+     }
+}
+
+
+void handleRenameResource(String bid,String file,String newname,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseFile lbf = findFile(file);
+   if (lbf == null) return;
+   File f = new File(newname);
+   LspBaseFile newlbf = new LspBaseFile(this,f,project_language);
+   Map<LspBaseFile,LspBaseFile> renames = new HashMap<>();
+   renames.put(lbf,newlbf);
+   willRenameFiles(renames);
+   lbf.getFile().renameTo(newlbf.getFile());
+   newlbf = renameLspFile(lbf,f);
+   renames.put(lbf,newlbf);
+   didRenameFiles(renames);
+}
+
+
+
 
 /********************************************************************************/
 /*										*/
@@ -712,7 +1008,7 @@ void willSaveFile(LspBaseFile lbf) throws LspBaseException
 
 
 
-void saveFile(LspBaseFile lbf) throws LspBaseException
+void didSaveFile(LspBaseFile lbf) throws LspBaseException
 { 
    if (lbf.getLanguageData().getCapabilityBool("textDocumentSync.Save")) {
       use_protocol.sendMessage("textDocument/didSave",
@@ -721,10 +1017,79 @@ void saveFile(LspBaseFile lbf) throws LspBaseException
 }
 
 
-void closeFile(LspBaseFile lbf) throws LspBaseException
+void didCloseFile(LspBaseFile lbf) throws LspBaseException
 {
    use_protocol.sendMessage("textDocument/didClose",
 	 "textDocument",lbf.getTextDocumentId());
+}
+
+
+void willDeleteFiles(List<LspBaseFile> files) throws LspBaseException
+{
+   if (files.isEmpty()) return;
+   LspBaseFile f0 = files.get(0);
+   if (f0.getLanguageData().getCapabilityBool("workspace.fileOperations.willDelete")) {
+      use_protocol.sendMessage("workspace/willDeleteFiles",
+            "files",getFileArray(files));
+    }
+}
+
+
+
+void didDeleteFiles(List<LspBaseFile> files) throws LspBaseException
+{ 
+   if (files.isEmpty()) return;
+   LspBaseFile f0 = files.get(0);
+   if (f0.getLanguageData().getCapabilityBool("workspace.fileOperations.didDelete")) {
+      use_protocol.sendMessage("workspace/didDeleteFiles",
+            "files",getFileArray(files));
+    }
+}
+
+
+
+void willRenameFiles(Map<LspBaseFile,LspBaseFile> files) throws LspBaseException
+{
+   if (files.isEmpty()) return;
+   if (getLanguageData().getCapabilityBool("workspace.fileOperations.willRename")) {
+      use_protocol.sendMessage("workspace/willRenameFiles",
+            "files",getFileArray(files));
+    }
+}
+
+
+
+void didRenameFiles(Map<LspBaseFile,LspBaseFile> files) throws LspBaseException
+{ 
+   if (files.isEmpty()) return;
+   if (getLanguageData().getCapabilityBool("workspace.fileOperations.didRename")) {
+      use_protocol.sendMessage("workspace/didRenameFiles",
+            "files",getFileArray(files));
+    }
+}
+
+
+private JSONArray getFileArray(List<LspBaseFile> files)
+{
+   JSONArray arr = new JSONArray();
+   for (LspBaseFile lbf : files) {
+      JSONObject fobj = createJson("uri",lbf.getUri());
+      arr.put(fobj);
+    }
+   return arr;
+}
+
+
+private JSONArray getFileArray(Map<LspBaseFile,LspBaseFile> files)
+{
+   JSONArray arr = new JSONArray();
+   for (Map.Entry<LspBaseFile,LspBaseFile> ent : files.entrySet()) {
+      LspBaseFile oldf = ent.getKey();
+      LspBaseFile newf = ent.getValue();
+      JSONObject fobj = createJson("oldUri",oldf.getUri(),"newUri",newf.getUri());
+      arr.put(fobj);
+    }
+   return arr;
 }
 
 
@@ -793,7 +1158,16 @@ void outputProject(boolean files,boolean paths,boolean clss,boolean opts,IvyXmlW
        }
     }
 
-// if (opts) nobase_prefs.outputXml(xw);
+   for (String s : project_references) {
+      xw.textElement("REFERENCES",s);
+    }
+   for (LspBaseProject rp : getReferencingProjects()) {
+      xw.textElement("USEDBY",rp.getName());
+    }
+   
+   if (opts) {
+      project_preferences.outputXml(xw); 
+    }
 
    xw.end("PROJECT");
 }
@@ -854,10 +1228,10 @@ private static class EditParameters {
 
    void setParameter(String name,String value) {
       if (name.equals("AUTOELIDE")) {
-	 auto_elide = Boolean.parseBoolean(value);
+         auto_elide = Boolean.parseBoolean(value);
        }
       else if (name.equals("ELIDEDELAY")) {
-	 delay_time = Integer.parseInt(value);
+         delay_time = Integer.parseInt(value);
        }
     }
 

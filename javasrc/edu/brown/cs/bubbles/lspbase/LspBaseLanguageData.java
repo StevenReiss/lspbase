@@ -214,6 +214,19 @@ Set<String> getCapabilityStrings(String key)
 
 
 
+boolean isSourceFile(File path)
+{
+   if (path.isDirectory()) return true;
+   String name = path.getName();
+   int idx = name.lastIndexOf(".");
+   if (idx < 0) return false;
+   String ext = name.substring(idx+1).toLowerCase();
+   if (file_extensions.contains(ext)) return true;
+   return false;
+}
+
+
+
 /********************************************************************************/
 /*                                                                              */
 /*      Output capabilities as preferences                                      */
@@ -270,13 +283,7 @@ FileFilter getSourceFilter()
 private class SourceFilter implements FileFilter {
 
    @Override public boolean accept(File path) {
-      if (path.isDirectory()) return true;
-      String name = path.getName();
-      int idx = name.lastIndexOf(".");
-      if (idx < 0) return false;
-      String ext = name.substring(idx+1).toLowerCase();
-      if (file_extensions.contains(ext)) return true;
-      return false;
+      return isSourceFile(path);
     }
 
 }	// end of inner class SourceFilter

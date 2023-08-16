@@ -250,6 +250,8 @@ private String handleCommand(String cmd,String proj,Element xml) throws LspBaseE
       case "FIXIMPORTS" :
       case "RENAME" :
       case "FORMATCODE" :
+      case "DELETE" :
+      case "RENAMERESOURCE" :
          lsp_base.getProjectManager().handleEditCommand(cmd,proj,xml,xw);
          break;
       case "LAUNCHES" :

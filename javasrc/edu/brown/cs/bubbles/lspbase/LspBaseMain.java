@@ -23,6 +23,7 @@
 package edu.brown.cs.bubbles.lspbase;
 
 import java.io.File;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -328,6 +329,11 @@ LspBaseLanguageData getBaseLanguage()
 LspBaseLanguageData getLanguageData(String lang)
 {
    return exec_map.get(lang);
+}
+
+Collection<LspBaseLanguageData> getAllLanguageData()
+{
+   return exec_map.values();
 }
 
 

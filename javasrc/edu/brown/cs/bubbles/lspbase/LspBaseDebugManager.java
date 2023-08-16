@@ -35,8 +35,6 @@ import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
-import javax.sql.rowset.spi.XmlWriter;
-
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.w3c.dom.Element;

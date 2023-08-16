@@ -25,6 +25,7 @@ package edu.brown.cs.bubbles.lspbase;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -130,6 +131,10 @@ File getWorkSpaceDirectory()
 }
 
 
+Collection<LspBaseProject> getAllProjects() 
+{
+   return all_projects.values();
+}
 
 private void forAllProjects(String proj,Consumer<LspBaseProject> f)
    throws LspBaseException
@@ -288,7 +293,16 @@ void handleCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
 	 handleSetPreferences(proj,pxml,xw);
 	 break;
       case "CREATEPROJECT" :
+         handleCreateProject(IvyXml.getAttrString(xml,"NAME"),
+               new File(IvyXml.getAttrString(xml,"DIR")),
+               IvyXml.getAttrString(xml,"TYPE"),
+               IvyXml.getChild(xml,"PROPS"),xw);
+         break;
       case "EDITPROJECT" :
+         handleEditProject(proj,
+               IvyXml.getChild(xml,"PROJECT"),xw);
+         break;
+
       case "CREATEPACKAGE" :
       case "CREATECLASS" :
       default :
@@ -408,7 +422,17 @@ void handleEditCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
 	       IvyXml.getAttrInt(xml,"START"),
 	       IvyXml.getAttrInt(xml,"END"),xw);
 	 break;
+      case "DELETE" :
+         handleDeleteResource(proj,
+               IvyXml.getAttrString(xml,"WHAT"),
+               IvyXml.getAttrString(xml,"PATH"));
          
+         break;
+      case "RENAMERESOURCE" :
+         handleRenameResource(proj,IvyXml.getAttrString(xml,"BID","*"),
+               IvyXml.getAttrString(xml,"FILE"),
+               IvyXml.getAttrString(xml,"NEWNAME"),xw);
+         break;
     }
 }
 
@@ -486,6 +510,41 @@ void handleCommit(String proj,String bid,
    xw.end("COMMIT");
 }
 
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      CREATEPROJECT  Command                                                  */
+/*                                                                              */
+/********************************************************************************/
+
+void handleCreateProject(String name,File dir,String type,Element props,IvyXmlWriter xw)
+{
+   LspBaseProjectCreator creator = new LspBaseProjectCreator(name,dir,type,props);
+   
+   if (!creator.setupProject()) return;
+   
+   xw.begin("PROJECT");
+   xw.field("NAME",name);
+   xw.end("PROJECT");
+}
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      EDITPROJECT command                                                     */
+/*                                                                              */
+/********************************************************************************/
+
+void handleEditProject(String proj,Element data,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseProject lbp = findProject(proj);
+   if (lbp != null) {
+      lbp.editProject(data);
+    }
+}
 
 
 
@@ -689,6 +748,40 @@ void handleFormatCode(String proj,String bid,String file,
    if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
    lbf.formatCode(bid,start,end,xw);
 }
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Handle DELETE (resource)                                                */
+/*                                                                              */
+/********************************************************************************/
+
+void handleDeleteResource(String proj,String what,String path)
+      throws LspBaseException
+{
+   if (what.equals("PROJECT")) {
+      // TODO: handle delete project
+    }
+   else {
+      LspBaseProject lbp = findProject(proj);
+      lbp.handleDeleteResource(what,path);
+    }
+}
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Handle RENAMERESOURCE                                                   */
+/*                                                                              */
+/********************************************************************************/
+
+void handleRenameResource(String proj,String bid,String file,String newname,IvyXmlWriter xw)
+      throws LspBaseException
+{
+   LspBaseProject lbp = findProject(proj);
+   lbp.handleRenameResource(bid,file,newname,xw);
+}
+
 
 
 

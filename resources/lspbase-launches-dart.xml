@@ -16,16 +16,40 @@
 </LAUNCHES>
 <PROJECT LANGUAGE='Dart'>
    <CREATE>
-      <TYPE NAME='DART' DESCRIPTION='Create Project for Existing Source' DEFAULT='TRUE RESULT='DART'>
+      <TYPE NAME='DART' DESCRIPTION='Create Dart Project for Existing Source' KIND='SOURCE'>
 	 <FIELD NAME='SOURCE_DIR' DESCRIPTION='Dart Project Directory' TYPE='DIRECTORY' EXISTS='TRUE'
 		CONTAINS='pubspec.yaml lib' />
       </TYPE>
-      <TYPE NAME='NEWDART' DESCRIPTION='Create New Dart Project' RESULT='DART'>
+      <TYPE NAME='NEWDART' DESCRIPTION='Create New Dart Project' KIND='NEW' >
 	 <FIELD NAME='SOURCE_DIR' DESCRIPTION='Dart Project Directory' TYPE='DIRECTORY' CANWRITE='TRUE' />
       </TYPE>
+      <TYPE NAME='FLUTTER' DESCRIPTION='Create Flutter Project for Existing Source' DEFAULT='TRUE' KIND='SOURCE'>
+	 <FIELD NAME='SOURCE_DIR' DESCRIPTION='Flutter Project Directory' TYPE='DIRECTORY' EXISTS='TRUE'
+		CONTAINS='pubspec.yaml lib' />
+      </TYPE>
+      <TYPE NAME='NEWFLUTTER' DESCRIPTION='Create New Flutter Project' KIND='NEW'>
+	  FIELD NAME='SOURCE_DIR' DESCRIPTION='Flutter Project Directory' TYPE='DIRECTORY' CANWRITE='TRUE' />
+      </TYPE>
    </CREATE>
+   <EDIT>
+      <TAB LABEL='Sources' TYPE='SOURCE' EXCLUDE='T' INCLUDE='T' MULTIPLE='F' />
+      <TAB LABEL='Libraries' TYPE='LIBRARY' />
+   </EDIT>
 </PROJECT>
 </LANGUAGE>
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

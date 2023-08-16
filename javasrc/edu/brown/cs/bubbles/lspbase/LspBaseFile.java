@@ -530,7 +530,7 @@ void close(String bid)
    base_ids.remove(bid);
    if (base_ids.isEmpty()) {
       try {
-         for_project.closeFile(this);
+         for_project.didCloseFile(this);
        }
       catch (LspBaseException e) {
          LspLog.logE("Problem closing file",e);
@@ -547,7 +547,7 @@ void refreshFile() throws LspBaseException
 {
    file_contents = null;
    ++file_version;
-   for_project.closeFile(this);
+   for_project.didCloseFile(this);
    loadContents();
    for_project.openFile(this);
    int len = file_contents.length(); 
@@ -1166,7 +1166,7 @@ boolean commit(boolean refresh,boolean save,boolean compile)
 	       "textDocument",getTextDocumentId());
        }
       else {
-	 for_project.closeFile(this);
+	 for_project.didCloseFile(this);
 	 for_project.openFile(this);
        }
     }
@@ -1181,7 +1181,7 @@ boolean commit(boolean refresh,boolean save,boolean compile)
       catch (IOException e) {
 	 LspLog.logE("Problem writing file",e);
        }
-      for_project.saveFile(this);
+      for_project.didSaveFile(this);
     }
    return false;
 }

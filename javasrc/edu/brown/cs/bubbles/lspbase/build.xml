@@ -17,11 +17,13 @@
       <path id='lspbase.classpath'>
 	 <pathelement location='${LSPBASE}/java' />
 	 <pathelement location='${IVYBIN}' />
+	 <fileset dir='${LSPBASE}/lib' includes='*.jar' />
 	 <fileset dir='${IVYLIB}/' includes='json.jar' />
       </path>
       <path id='test.classpath'>
 	 <pathelement location='${LSPBASE}/java' />
 	 <pathelement location='${IVYBIN}' />
+	 <fileset dir='${LSPBASE}/lib' includes='*.jar' />
 	 <fileset dir='${IVYLIB}/' includes='json.jar' />
       </path>
    </target>

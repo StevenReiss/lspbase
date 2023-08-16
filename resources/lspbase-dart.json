@@ -357,6 +357,28 @@
       }
     },
   lspbaseConfiguration: {
+     "projects" : {
+	"library" : "pubspec.yaml",
+	"libraryAdd" : "dart pub add $(LIB)",
+	"libraryRemove" : "dart pub remove $(LIB)",
+	"nest" : true,
+	"projectTypes" : [ "DART", "NEWDART", "FLUTTER", "NEWFLUTTER" ],
+	"userDirectories" : [ "lib", "resources" ],
+	"dart" : {
+	   "kind" : "SOURCE"
+	 },
+	"newdart" : {
+	   "kind" : "NEW",
+	   "command" : "dart create $(PROJECT)"
+	 },
+	"flutter" : {
+	   "kind" : "SOURCE"
+	 },
+	"newflutter" : {
+	   "kind" : "NEW",
+	   "command" : "flutter create $(PROJECT)"
+	 },
+      },
      "useParameters" : false,
      "fileModule" : true,
      "splitIndent" : false,
