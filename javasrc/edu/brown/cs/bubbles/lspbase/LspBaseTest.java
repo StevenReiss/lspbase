@@ -263,7 +263,6 @@ private void lookupPoint(String proj,String fil,int where)
 
 
 
-@SuppressWarnings("unused")
 private void delay(int time)
 {
    try {

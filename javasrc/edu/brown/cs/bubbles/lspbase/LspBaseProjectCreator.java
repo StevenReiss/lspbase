@@ -76,6 +76,8 @@ private static final String PROJ_PROP_SOURCE = "ProjectSource";
 private static final String PROJ_PROP_LIBS = "ProjectLibraries";
 private static final String PROJ_PROP_LINKS = "ProjectLinks";
 private static final String PROJ_PROP_IGNORES = "ProjectIgnores";
+private static final String PROJ_PROP_LANGUAGE = "ProjectLanguage";
+private static final String PROJ_PROP_TYPE = "ProjectType";
 
 
 
@@ -90,17 +92,14 @@ LspBaseProjectCreator(String name,File dir,String type,Element props)
    project_name = name;
    project_dir = dir;
    project_lang = null;
-   LspBaseMain lspbase = LspBaseMain.getLspMain();
-   for (LspBaseLanguageData ld : lspbase.getAllLanguageData()) {
-      Set<String> ptyps = ld.getCapabilityStrings("lsp.projects.projectTypes");
-      if (ptyps.contains(type)) {
-         project_lang = ld;
-         cap_prefix = "lsp.projects." + type.toLowerCase() + ".";
-         break;
-       }
-    }
    
    setupPropMap(props);
+   
+   String lang = propString(PROJ_PROP_LANGUAGE);
+   String typ = propString(PROJ_PROP_TYPE);
+   
+   project_lang = LspBaseMain.getLspMain().getLanguageData(lang);
+   cap_prefix = "lsp.projects." + typ.toLowerCase() + ".";
 }
 
 
@@ -436,7 +435,7 @@ private void checkFileProperties(File f,JSONArray checks)
 private boolean generateProjectFile()
 {
    // might need eclipse-specific here
-   
+   if (!project_dir.exists() && !project_dir.mkdir()) return false;
    try (IvyXmlWriter xw = new IvyXmlWriter(new File(project_dir,".lspproject"))) {
       xw.outputHeader();
       xw.begin("PROJECT");
@@ -467,7 +466,7 @@ private boolean generateProjectFile()
          // handle nested
          xw.end("PATH");
        }
-      
+      xw.end("PROJECT");
     }
    catch (Throwable t) {
       return false;

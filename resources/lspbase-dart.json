@@ -379,6 +379,7 @@
 	   "command" : "flutter create $(PROJECT)"
 	 },
       },
+     "extensions" : [ "dart" ],
      "useParameters" : false,
      "fileModule" : true,
      "splitIndent" : false,

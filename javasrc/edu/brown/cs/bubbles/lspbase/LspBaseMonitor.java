@@ -23,6 +23,7 @@
 package edu.brown.cs.bubbles.lspbase;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.net.InetAddress;
@@ -215,6 +216,9 @@ private String handleCommand(String cmd,String proj,Element xml) throws LspBaseE
       case "GETHOST" :
 	 handleGetHost(xw);
 	 break;
+      case "LAUNCHES" :
+	 getLanguageData(proj,xw);
+	 break;
          
       case "PROJECTS" :
       case "OPENPROJECT" :
@@ -254,8 +258,6 @@ private String handleCommand(String cmd,String proj,Element xml) throws LspBaseE
       case "RENAMERESOURCE" :
          lsp_base.getProjectManager().handleEditCommand(cmd,proj,xml,xw);
          break;
-      case "LAUNCHES" :
-      case "LANGUAGEDATA" :
       case "LAUNCHQUERY" :
       case "GETRUNCONFIG" :
       case "NEWRUNCONFIG" :
@@ -369,6 +371,36 @@ private void handleGetHost(IvyXmlWriter xw)
    if (h1 != null) xw.field("ADDR",h1);
    if (h2 != null) xw.field("NAME",h2);
    if (h3 != null) xw.field("CNAME",h3);
+}
+
+
+/********************************************************************************/
+/*										*/
+/*	Configuration Support			        			*/
+/*										*/
+/********************************************************************************/
+
+private void getLanguageData(String proj,IvyXmlWriter xw)
+{
+   String lang = null;
+   
+   if (proj != null) {
+      try {
+	 LspBaseProject lspproj = lsp_base.getProjectManager().findProject(proj);
+	 lang = lspproj.getLanguageData().getName();
+       }
+      catch (LspBaseException e) {
+	 lang = lsp_base.getBaseLanguage();
+       }
+    }
+   else {
+      lang = lsp_base.getBaseLanguage();
+    }
+   
+   String nm = "lspbase-launches-" + lang + ".xml";
+   InputStream ins = LspBaseMain.getResourceAsStream(nm);
+   Element xml = IvyXml.loadXmlFromStream(ins);
+   xw.writeXml(xml);
 }
 
 

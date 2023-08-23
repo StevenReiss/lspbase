@@ -241,7 +241,7 @@ void open() throws LspBaseException
 	 File dir = ps.getFile();
 	 File dir1 = getUserSourceDirectory(dir);
 	 if (dir1 != null) {
-	    findFiles(ps,null,dir1,false);
+	    findFiles(ps,null,dir1,false,0);
 	  }
        }
     }
@@ -269,20 +269,40 @@ private File getUserSourceDirectory(File dir)
 
 
 
-protected void findFiles(LspBasePathSpec spec,String pfx,File f,boolean reload)
+protected void findFiles(LspBasePathSpec spec,String pfx,File f,boolean reload,int lvl)
 {
    boolean nest = spec.isNested() || f.equals(spec.getFile());
    if (!spec.useFile(f)) return;
 
    FileFilter filter = lsp_base.getLanguageData(project_language).getSourceFilter();
+   LspBaseLanguageData ld = getLanguageData();
 
    if (f.isDirectory()) {
+      Set<File> use = null;
+      if (lvl == 0 && !ld.getCapabilityBool("lsp.projects.packaged")) {
+         JSONArray srcarr = ld.getCapabilityArray("lsp.projects.userDirectories");
+         if (srcarr != null) {
+            for (int i = 0; i < srcarr.length(); ++i) {
+               String srcnm = srcarr.getString(i);
+               File d1 = new File(f,srcnm);
+               if (d1.exists()) {
+                  if (use == null) use = new HashSet<>();
+                  use.add(d1);
+                } 
+             }
+          }
+       }
+      if (f.getName().startsWith(".")) return;
+      Set<String> skip = ld.getCapabilitySet("lsp.projects.skip");
+      if (skip != null && skip.contains(f.getName())) return;
+      
       File [] fls = f.listFiles(filter);
       String npfx = null;
       if (pfx != null) npfx = pfx + "." + f.getName();
       for (File f1 : fls) {
 	 if (!nest && f1.isDirectory()) continue;
-	 findFiles(spec,npfx,f1,reload);
+         if (use != null && !use.contains(f1)) continue;
+	 findFiles(spec,npfx,f1,reload,lvl+1);
        }
       return;
     }
@@ -639,7 +659,7 @@ void build(boolean refresh,boolean reload)
    for (LspBasePathSpec ps : project_paths) {
       if (ps.isUser()) {
 	 File dir = ps.getFile();
-	 findFiles(ps,null,dir,reload);
+	 findFiles(ps,null,dir,reload,0);
        }
     }
    

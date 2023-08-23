@@ -998,7 +998,7 @@ void findRegions(String cls,boolean pfx,boolean stat,boolean compunit,
     }
 
    if (compunit) {
-      outputRange(0,getLength(),xw);
+      outputRange(0,getLength()-1,xw);
     }
 
    if (pfx) {

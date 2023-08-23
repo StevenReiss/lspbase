@@ -24,14 +24,17 @@ package edu.brown.cs.bubbles.lspbase;
 
 import java.io.File;
 import java.io.FileFilter;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.StringTokenizer;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+
+import edu.brown.cs.ivy.file.IvyFile;
 
 class LspBaseLanguageData implements LspBaseConstants
 {
@@ -47,6 +50,8 @@ private String language_name;
 private String lspexec_string;
 private String dapexec_string; 
 private Map<String,Object> server_capabilities;
+private JSONObject lsp_configuration;
+private JSONObject client_configuration;
 private JSONObject dap_configuration;
 private boolean single_workspace;
 private Set<String> file_extensions;
@@ -59,19 +64,34 @@ private Set<String> file_extensions;
 /*                                                                              */
 /********************************************************************************/
 
-LspBaseLanguageData(String name,String exec,String dap,String ext,boolean single) {
+LspBaseLanguageData(String name,String exec,String dap,boolean single) {
    language_name = name;
    lspexec_string = exec;
    dapexec_string = dap;
    single_workspace = single;
    server_capabilities = new HashMap<>();
-   file_extensions = new HashSet<>();
-   StringTokenizer tok = new StringTokenizer(ext,".");
-   while (tok.hasMoreTokens()) {
-      String extd = tok.nextToken();
-      file_extensions.add(extd.toLowerCase());
-    }
+   file_extensions = null;
+   lsp_configuration = null;
+   client_configuration = null;
    dap_configuration = null;
+   
+   String rname = "lspbase-" + name + ".json";
+   String json = null;
+   try (InputStream ins = LspBaseMain.getResourceAsStream(rname)) {
+      if (ins != null) json = IvyFile.loadFile(ins);
+    }
+   catch (IOException e) { }
+   try {
+      JSONObject cfg = new JSONObject(json);
+      setCapabilities("lsp",cfg.getJSONObject("lspbaseConfiguration"));
+      lsp_configuration = cfg.getJSONObject("initialConfiguration");
+      client_configuration = cfg.getJSONObject("clientConfiguration");
+      dap_configuration = cfg.getJSONObject("debugConfiguration");
+    }
+   catch (Throwable e) {
+      LspLog.logE("Problem with capability json: ",e);
+      System.exit(1);
+    }
 }
 
 
@@ -87,7 +107,8 @@ String getDapExecString()                       { return dapexec_string; }
 boolean isSingleWorkspace()                     { return single_workspace; }
 
 JSONObject getDebugConfiguration()              { return dap_configuration; }
-void setDebugConfiguration(JSONObject cfg)      { dap_configuration = cfg; }
+JSONObject getLspConfiguration()                { return lsp_configuration; }
+JSONObject getClientConfiguration()             { return client_configuration; }
 
 
 
@@ -216,6 +237,13 @@ Set<String> getCapabilityStrings(String key)
 
 boolean isSourceFile(File path)
 {
+   if (file_extensions == null) {
+      file_extensions = new HashSet<>();
+      JSONArray arr = getCapabilityArray("lsp.extensions");
+      for (Object o : arr) {
+         file_extensions.add(o.toString());
+       }
+    }
    if (path.isDirectory()) return true;
    String name = path.getName();
    int idx = name.lastIndexOf(".");

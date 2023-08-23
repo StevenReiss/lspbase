@@ -83,7 +83,7 @@ private static double CHILD_PRIORITY = 0.98;
 private String [] ElideDeclTypes = {
       null, "COMPUNIT", "MODULE", null, null,
       "CLASS", "METHOD", "ANNOT", "FIELD", "METHOD",
-      "ENUM", "CLASS", "METHOD", "VARDECL", "VARDECL",
+      "ENUM", "CLASS", "METHOD", "VARIABLE", "VARIABLE",
       null, null, null, null, null,
       null, null, "ENUMC", "CLASS", null,
       null, null

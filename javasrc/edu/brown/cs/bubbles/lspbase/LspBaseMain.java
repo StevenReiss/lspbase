@@ -23,6 +23,7 @@
 package edu.brown.cs.bubbles.lspbase;
 
 import java.io.File;
+import java.io.InputStream;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -81,12 +82,12 @@ private LspBaseDebugManager	debug_manager;
 private File			work_directory;
 private LspBaseThreadPool	thread_pool;
 private Timer			lsp_timer;
-// private LspBasePreferences	system_prefs;
 private Map<String,LspBaseProtocol> active_protocols;
 private Map<File,LspBaseProtocol> workspace_protocols;
+private String                  base_language;
 
 
-static private LspBaseMain		lspbase_main;
+private static LspBaseMain		lspbase_main;
 private static final Map<String,LspBaseLanguageData> exec_map;
 
 
@@ -98,9 +99,8 @@ static {
    dartcmd += " --protocol=lsp";
    String dapcmd = "flutter debug_adapter";
    exec_map.put("dart",new LspBaseLanguageData("dart",dartcmd,
-	 dapcmd,".dart",false));
+	 dapcmd,false));
 }
-
 
 
 
@@ -176,8 +176,8 @@ private void scanArgs(String [] args)
 	    LspLog.setUseStdErr(false);
 	    havelog = true;
 	  }
-	 else if (args[i].startsWith("-lang") && i+1 < args.length) {
-	    LspLog.logD("SET LANGUAGE TO " + args[++i]);
+	 else if (args[i].startsWith("-lang") && i+1 < args.length) {   // -lang <lang>
+            base_language = args[++i].toLowerCase();
 	  }
 	 else if (args[i].startsWith("-err")) {                         // -err
 	    LspLog.setUseStdErr(true);
@@ -283,57 +283,73 @@ private void waitForShutDown()
 LspBaseProtocol findProtocol(File ws,String lang,List<LspBasePathSpec> paths)
 {
    LspBaseProtocol proto = null;
+   
+   lang = lang.toLowerCase();
 
    synchronized (workspace_protocols) {
       if (ws != null) proto = workspace_protocols.get(ws);
       if (proto != null) return proto;
       
-      LspBaseLanguageData ld = exec_map.get(lang);
+      LspBaseLanguageData ld = getLanguageData(lang);
       if (ld == null) return null;
       if (!ld.isSingleWorkspace()) {
 	 proto = active_protocols.get(lang);
 	 if (proto != null) {
 	    proto.addWorkspace(ws,paths);
-	    return proto;
 	  }
        }
-      proto = new LspBaseProtocol(ws,paths,ld);
-      active_protocols.put(lang,proto);
-      workspace_protocols.put(ws,proto);
-      if (ld.isSingleWorkspace()) {
-         try {
-            proto.initialize();
-          }
-         catch (LspBaseException e) {
-            LspLog.logE("Can't initialize protocol",e);
-            proto = null;
+      if (proto == null) {
+         proto = new LspBaseProtocol(ws,paths,ld);
+         active_protocols.put(lang,proto);
+         workspace_protocols.put(ws,proto);
+         if (ld.isSingleWorkspace()) {
+            try {
+               proto.initialize();
+             }
+            catch (LspBaseException e) {
+               LspLog.logE("Can't initialize protocol",e);
+               proto = null;
+             }
           }
        }
+    }
+   
+   if (base_language == null && proto != null) {
+      base_language = lang;
     }
 
    return proto;
 }
 
 
-LspBaseLanguageData getBaseLanguage()
+String getBaseLanguage()
 {
-   for (String lang : active_protocols.keySet()) {
-      LspBaseLanguageData ld = getLanguageData(lang);
-      if (ld != null) return ld;
-    }
-   
-   return null;
+   return base_language;
 }
 
 
 LspBaseLanguageData getLanguageData(String lang)
 {
+   lang = lang.toLowerCase();
    return exec_map.get(lang);
 }
+
 
 Collection<LspBaseLanguageData> getAllLanguageData()
 {
    return exec_map.values();
+}
+
+
+
+static InputStream getResourceAsStream(String name)
+{
+   InputStream ins = LspBaseMain.class.getClassLoader().getResourceAsStream(name);
+   if (ins == null) {
+      String n1 = "resources/" + name;
+      ins = LspBaseMain.class.getClassLoader().getResourceAsStream(n1);
+    }
+   return ins;
 }
 
 
@@ -415,9 +431,9 @@ private static class LspBaseThreadPool extends ThreadPoolExecutor implements Thr
 
    LspBaseThreadPool() {
       super(LSPBASE_CORE_POOL_SIZE,LSPBASE_MAX_POOL_SIZE,
-	    LSPBASE_POOL_KEEP_ALIVE_TIME,TimeUnit.MILLISECONDS,
-	    new LinkedBlockingQueue<Runnable>());
-
+            LSPBASE_POOL_KEEP_ALIVE_TIME,TimeUnit.MILLISECONDS,
+            new LinkedBlockingQueue<Runnable>());
+   
       setThreadFactory(this);
     }
 

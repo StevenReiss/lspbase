@@ -66,7 +66,6 @@ private LspBaseLanguageData for_language;
 private Writer message_stream;
 private Map<String,File> pathWorkspaceMap;
 private Map<File,List<LspBasePathSpec>> workspacePathMap;
-private JSONObject config_data;
 
 
 
@@ -89,23 +88,6 @@ LspBaseProtocol(File workspace,List<LspBasePathSpec> paths,LspBaseLanguageData l
 
    for_language = ld;
    client_id = ld.getName() + "_" + workspace.getName();
-
-   String rname = "lspbase-" + for_language.getName() + ".json";
-   String json = null;
-   try (InputStream ins = LspBaseProtocol.class.getClassLoader().getResourceAsStream(rname)) {
-      if (ins != null) json = IvyFile.loadFile(ins);
-    }
-   catch (IOException e) { }
-   config_data = null;
-   try {
-      config_data = new JSONObject(json);
-      for_language.setCapabilities("lsp",config_data.getJSONObject("lspbaseConfiguration"));
-      for_language.setDebugConfiguration(config_data.getJSONObject("debugConfiguration"));
-    }
-   catch (Throwable e) {
-      LspLog.logE("Problem with capability json: ",e);
-      System.exit(1);
-    }
 
    String command = ld.getLspExecString();
    Map<String,String> keys = new HashMap<>();
@@ -206,7 +188,7 @@ void initialize() throws LspBaseException
       doing_initialization = true;
     }
 
-   JSONObject clientcaps = config_data.getJSONObject("initialConfiguration");
+   JSONObject clientcaps = for_language.getLspConfiguration();
 
    JSONObject obj = new JSONObject();
    obj.put("workdoneToken","INITIALIZING");
@@ -606,7 +588,7 @@ void processNotification(Integer id,String method,Object params)
 
 Object handleWorkspaceConfiguration(int id,JSONObject params)
 {
-   JSONObject clientconfig = config_data.getJSONObject("clientConfiguration");
+   JSONObject clientconfig = for_language.getClientConfiguration();
 
    JSONArray items = params.getJSONArray("items");
    JSONArray result = new JSONArray();

@@ -80,6 +80,12 @@ LspBaseProjectManager(LspBaseMain nm) throws LspBaseException
 
    File pf1 = new File(ws,".preferences");
    system_preferences = new LspBasePreferences(pf1);
+   String s = lsp_main.getBaseLanguage();
+   if (s != null) {
+      LspBaseLanguageData ld = lsp_main.getLanguageData(s);
+      ld.addPreferences("lspbase",system_preferences);
+      system_preferences.flush();
+    }
 
    loadProjects();
 }
@@ -519,10 +525,17 @@ void handleCommit(String proj,String bid,
 /********************************************************************************/
 
 void handleCreateProject(String name,File dir,String type,Element props,IvyXmlWriter xw)
+      throws LspBaseException
 {
    LspBaseProjectCreator creator = new LspBaseProjectCreator(name,dir,type,props);
    
    if (!creator.setupProject()) return;
+   
+   LspBaseProject lbp = addProject(name,dir);
+   lbp.open();
+   IvyXmlWriter msg = lsp_main.beginMessage("PROJECTOPEN");
+   msg.field("PROJECT",name);
+   lsp_main.finishMessage(msg);
    
    xw.begin("PROJECT");
    xw.field("NAME",name);
@@ -1034,14 +1047,13 @@ void handlePreferences(String proj,String lang,IvyXmlWriter xw)
    if (proj == null) {
       opts = system_preferences;
       if (lang != null) {
-         forAllProjects(null,this::ensureInitialized);
-         LspBaseMain lsp = LspBaseMain.getLspMain();
          if (lang.endsWith("Lsp")) {
             lang = lang.substring(0,lang.length()-3);
           }
-         lang = lang.toLowerCase();
-         LspBaseLanguageData ld = lsp.getLanguageData(lang);
-         opts = addLanguageOptions(opts,ld);
+         if (!lang.equalsIgnoreCase(lsp_main.getBaseLanguage())) {
+            LspBaseLanguageData ld = lsp_main.getLanguageData(lang);
+            opts = addLanguageOptions(opts,ld);
+          }
        }
     }
    else {
@@ -1070,6 +1082,7 @@ private LspBasePreferences addLanguageOptions(LspBasePreferences opts,LspBaseLan
 void ensureInitialized(LspBaseProject p) 
 {
    try {
+      if (!p.isOpen()) p.open();
       p.getProtocol().initialize();
     }
    catch (LspBaseException e) { }
@@ -1080,7 +1093,13 @@ void ensureInitialized(LspBaseProject p)
 void handleSetPreferences(String proj,Element xml,IvyXmlWriter xw)
    throws LspBaseException
 {
-   forAllProjects(proj,(LspBaseProject np) -> setProjectPreferences(np,xml));
+   if (proj == null) {
+      setProjectPreferences(null,xml);
+    }
+   else {
+      LspBaseProject bp = findProject(proj);
+      setProjectPreferences(bp,xml);
+    }
 }
 
 
@@ -1125,6 +1144,14 @@ void loadProjects()
     }
 
    saveProjects();
+}
+
+
+LspBaseProject addProject(String name,File dir) 
+{
+   LspBaseProject lbp = loadProject(name,dir);
+   saveProjects();
+   return lbp;
 }
 
 

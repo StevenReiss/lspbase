@@ -123,10 +123,6 @@ void handleCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
    waitForStart();
 
    switch (cmd) {
-      case "LAUNCHES" :
-      case "LANGUAGEDATA" :
-	 getLanguageData(proj,xw);
-	 break;
       case "LAUNCHQUERY" :
 	 handleLaunchQuery(proj,
 	       IvyXml.getAttrString(xml,"QUERY"),
@@ -275,34 +271,7 @@ LspBaseDebugProtocol getDebugProtocol(LspBaseDebugTarget tgt)
 
 
 
-/********************************************************************************/
-/*										*/
-/*	Launch Configuration Support						*/
-/*										*/
-/********************************************************************************/
 
-private void getLanguageData(String proj,IvyXmlWriter xw)
-{
-   LspBaseLanguageData ld = null;
-
-   if (proj != null) {
-      try {
-	 LspBaseProject lspproj = lsp_base.getProjectManager().findProject(proj);
-	 ld = lspproj.getLanguageData();
-       }
-      catch (LspBaseException e) {
-	 ld = lsp_base.getBaseLanguage();
-       }
-    }
-   else {
-      ld = lsp_base.getBaseLanguage();
-    }
-
-   String nm = "resources/lspbase-launches-" + ld.getName() + ".xml";
-   InputStream ins = LspBaseDebugManager.class.getClassLoader().getResourceAsStream(nm);
-   Element xml = IvyXml.loadXmlFromStream(ins);
-   xw.writeXml(xml);
-}
 
 
 
