@@ -96,7 +96,7 @@
 	  },
 	"hover" : {
 	   "dynamicRegistration" : false,
-	   "contentFormat" : [ "plaintext" ]
+	   "contentFormat" : [ "markdown","plaintext" ]
 	 },
 	"signatureHelp" : {
 	   "dynamiceRegistration" : false,
@@ -280,7 +280,7 @@
 	   "engine" : "ECMAScript",
 	   "version" : "ES2020"
 	 },
-	"markDown" : {
+	"markdown" : {
 	   "parser" : "marked",
 	   "version" : "1.1.0",
 	   "allowedTags" : [ ]

@@ -35,7 +35,98 @@
       <TAB LABEL='Sources' TYPE='SOURCE' EXCLUDE='T' INCLUDE='T' MULTIPLE='F' />
       <TAB LABEL='Libraries' TYPE='LIBRARY' />
    </EDIT>
+   <BUTTONS>
+      <BUTTON TYPE='NEWMETHOD' LABEL='New Function ...' />
+      <BUTTON TYPE='NEWFIELD' LABEL='New Attribute ...' />
+      <BUTTON TYPE='NEWINNERTYPE' LABEL='New Class ...' />
+      <BUTTON TYPE='NEWFILE' />
+   </BUTTONS>
 </PROJECT>
+<EDITING>
+   <TOKENS MUTLILINE='"""' COMMENTS='/* //'>
+      <STRING>'"</STRING>
+   </TOKENS>
+   <NAMES FIELDS='VARIABLES' />
+   <KEYPAIRS>
+      <KEY START='{' END='}' />
+      <KEY START='(' END=')' />
+      <KEY START='[' END=']' />
+      <KEY START="'" END="'" />
+      <KEY START='"' END='"' />
+   </KEYPAIRS>
+   <KEYWORDS>
+      <KEYWORD NAME="abstract" TYPE="KEYWORD" />
+      <KEYWORD NAME="as" TYPE="KEYWORD" />
+      <KEYWORD NAME="assert" TYPE="KEYWORD" />
+      <KEYWORD NAME="async" TYPE="KEYWORD" />
+      <KEYWORD NAME="await" TYPE="KEYWORD" />
+      <KEYWORD NAME="base" TYPE="KEYWORD" />
+      <KEYWORD NAME="break" TYPE="BREAK" />
+      <KEYWORD NAME="case" TYPE="CASE" />
+      <KEYWORD NAME="catch" TYPE="CATCH" />
+      <KEYWORD NAME="class" TYPE="CLASS" />
+      <KEYWORD NAME="const" TYPE="KEYWORD" />
+      <KEYWORD NAME="continue" TYPE="KEYWORD" />
+      <KEYWORD NAME="covariant" TYPE="TYPEKEY" />
+      <KEYWORD NAME="default" TYPE="DEFAULT" />
+      <KEYWORD NAME="deferred" TYPE="DEFAULT" />
+      <KEYWORD NAME="do" TYPE="DO" />
+      <KEYWORD NAME="dynamic" TYPE="TYPEKEY" />
+      <KEYWORD NAME="else" TYPE="ELSE" />
+      <KEYWORD NAME="enum" TYPE="ENUM" />
+      <KEYWORD NAME="export" TYPE="ENUM" />
+      <KEYWORD NAME="extends" TYPE="KEYWORD" />
+      <KEYWORD NAME="extension" TYPE="KEYWORD" />
+      <KEYWORD NAME="external" TYPE="KEYWORD" />
+      <KEYWORD NAME="factory" TYPE="KEYWORD" />
+      <KEYWORD NAME="false" TYPE="KEYWORD" />
+      <KEYWORD NAME="final" TYPE="KEYWORD" />
+      <KEYWORD NAME="finally" TYPE="FINALLY" />
+      <KEYWORD NAME="for" TYPE="FOR" />
+      <KEYWORD NAME="Function" TYPE="TYPEKEY" />
+      <KEYWORD NAME="get" TYPE="TYPEKEY" />
+      <KEYWORD NAME="hide" TYPE="GOTO" />
+      <KEYWORD NAME="if" TYPE="IF" />
+      <KEYWORD NAME="implements" TYPE="KEYWORD" />
+      <KEYWORD NAME="import" TYPE="IMPORT" />
+      <KEYWORD NAME="in" TYPE="KEYWORD" />
+      <KEYWORD NAME="interface" TYPE="INTERFACE" />
+      <KEYWORD NAME="is" TYPE="TYPEKEY" />
+      <KEYWORD NAME="late" TYPE="TYPEKEY" />
+      <KEYWORD NAME="library" TYPE="TYPEKEY" />
+      <KEYWORD NAME="mixin" TYPE="TYPEKEY" />
+      <KEYWORD NAME="new" TYPE="NEW" />
+      <KEYWORD NAME="null" TYPE="KEYWORD" />
+      <KEYWORD NAME="on" TYPE="KEYWORD" />
+      <KEYWORD NAME="operator" TYPE="KEYWORD" />
+      <KEYWORD NAME="part" TYPE="PACKAGE" />
+      <KEYWORD NAME="required" TYPE="KEYWORD" />
+      <KEYWORD NAME="rethrow" TYPE="KEYWORD" />
+      <KEYWORD NAME="return" TYPE="RETURN" />
+      <KEYWORD NAME="sealed" TYPE="TYPEKEY" />
+      <KEYWORD NAME="set" TYPE="KEYWORD" />
+      <KEYWORD NAME="show" TYPE="KEYWORD" />
+      <KEYWORD NAME="static" TYPE="STATIC" />
+      <KEYWORD NAME="super" TYPE="KEYWORD" />
+      <KEYWORD NAME="switch" TYPE="SWITCH" />
+      <KEYWORD NAME="sync" TYPE="SYNCHRONIZED" />
+      <KEYWORD NAME="this" TYPE="KEYWORD" />
+      <KEYWORD NAME="throw" TYPE="KEYWORD" />
+      <KEYWORD NAME="true" TYPE="KEYWORD" />
+      <KEYWORD NAME="try" TYPE="TRY" />
+      <KEYWORD NAME="typedef" TYPE="KEYWORD" />
+      <KEYWORD NAME="var" TYPE="KEYWORD" />
+      <KEYWORD NAME="void" TYPE="TYPEKEY" />
+      <KEYWORD NAME="when" TYPE="KEYWORD" />
+      <KEYWORD NAME="while" TYPE="WHILE" />
+      <KEYWORD NAME="with" TYPE="KEYWORD" />
+      <KEYWORD NAME="yield" TYPE="KEYWORD" />
+   </KEYWORDS>
+   <OPERATORS><![CDATA[
+      = < ! ~ ? : == <= >= != || && ++ -- + - * / & | ^ % << += -= *= /= &= |= ^= %=
+      <<= >>= >>>= >> >>> > :: -> ~/ ?? .. ?.. ?.
+   ]]></OPERATORS>
+</EDITING>
 </LANGUAGE>
 
 

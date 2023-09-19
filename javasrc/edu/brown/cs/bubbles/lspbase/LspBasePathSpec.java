@@ -1,21 +1,21 @@
 /********************************************************************************/
-/*                                                                              */
-/*              LspBasePathSpec.java                                            */
-/*                                                                              */
-/*      Path specification                                                      */
-/*                                                                              */
+/*										*/
+/*		LspBasePathSpec.java						*/
+/*										*/
+/*	Path specification							*/
+/*										*/
 /********************************************************************************/
-/*      Copyright 2011 Brown University -- Steven P. Reiss                    */
+/*	Copyright 2011 Brown University -- Steven P. Reiss		      */
 /*********************************************************************************
- *  Copyright 2011, Brown University, Providence, RI.                            *
- *                                                                               *
- *                        All Rights Reserved                                    *
- *                                                                               *
- * This program and the accompanying materials are made available under the      *
+ *  Copyright 2011, Brown University, Providence, RI.				 *
+ *										 *
+ *			  All Rights Reserved					 *
+ *										 *
+ * This program and the accompanying materials are made available under the	 *
  * terms of the Eclipse Public License v1.0 which accompanies this distribution, *
- * and is available at                                                           *
- *      http://www.eclipse.org/legal/epl-v10.html                                *
- *                                                                               *
+ * and is available at								 *
+ *	http://www.eclipse.org/legal/epl-v10.html				 *
+ *										 *
  ********************************************************************************/
 
 
@@ -37,9 +37,9 @@ class LspBasePathSpec implements LspBaseConstants
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Private Storage                                                         */
-/*                                                                              */
+/*										*/
+/*	Private Storage 							*/
+/*										*/
 /********************************************************************************/
 
 private File directory_file;
@@ -53,9 +53,9 @@ private Set<String> include_patterns;
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Constructors                                                            */
-/*                                                                              */
+/*										*/
+/*	Constructors								*/
+/*										*/
 /********************************************************************************/
 
 LspBasePathSpec(Element xml)
@@ -69,12 +69,12 @@ LspBasePathSpec(Element xml)
     }
    else {
       is_user = true;
-      String typ = IvyXml.getAttrString(xml,"TYPE");
+      String typ = IvyXml.getAttrString(xml,"TYPE","USER");
       switch (typ) {
-         case "LIBRARY" :
-            is_user = false;
-            break;
-         default :
+	 case "LIBRARY" :
+	    is_user = false;
+	    break;
+	 default :
        }
     }
    include_patterns = new LinkedHashSet<>();
@@ -86,10 +86,10 @@ LspBasePathSpec(Element xml)
    for (Element e : IvyXml.children(xml,"EXCLUDE")) {
       String s = IvyXml.getAttrString(e,"PATH");
       exclude_patterns.add(s);
-    } 
+    }
    version_info = IvyXml.getTextElement(xml,"VERSION");
    directory_file = new File(fnm);
-   is_nested = IvyXml.getAttrBool(xml,"NEST");
+   is_nested = IvyXml.getAttrBool(xml,"NESTED");
    path_id = IvyXml.getAttrInt(xml,"ID",0);
 }
 
@@ -123,7 +123,7 @@ void updateFrom(LspBasePathSpec nspec)
    is_user = nspec.is_user;
    is_nested = nspec.is_nested;
    version_info = nspec.version_info;
-   if (path_id == 0) path_id = nspec.path_id;      
+   if (path_id == 0) path_id = nspec.path_id;
    include_patterns = new LinkedHashSet<>(nspec.include_patterns);
    exclude_patterns = new LinkedHashSet<>(nspec.exclude_patterns);
 }
@@ -138,7 +138,7 @@ void updateFrom(LspBasePathSpec nspec)
 
 File getFile()				{ return directory_file; }
 
-String getInfo()                        { return version_info; }
+String getInfo()			{ return version_info; }
 
 boolean isUser()			{ return is_user; }
 
@@ -157,8 +157,8 @@ void setProperties(boolean usr,boolean exc,boolean nest)
    is_nested = nest;
 }
 
-Collection<String> getExcludes()        { return exclude_patterns; }
-Collection<String> getIncludes()        { return include_patterns; }
+Collection<String> getExcludes()	{ return exclude_patterns; }
+Collection<String> getIncludes()	{ return include_patterns; }
 
 
 /********************************************************************************/
@@ -167,7 +167,7 @@ Collection<String> getIncludes()        { return include_patterns; }
 /*										*/
 /********************************************************************************/
 
-boolean useFile(File path) 
+boolean useFile(File path)
 {
    boolean incl = true;
    for (String s : exclude_patterns) {
@@ -175,7 +175,7 @@ boolean useFile(File path)
     }
    if (!incl) {
       for (String s : include_patterns) {
-         if (match(s,path)) incl = true;
+	 if (match(s,path)) incl = true;
        }
     }
    return incl;
@@ -183,18 +183,18 @@ boolean useFile(File path)
 
 
 
-private boolean match(String pat,File path) 
+private boolean match(String pat,File path)
 {
    File f = new File(pat);
    if (path == null) return false;
    else if (!f.isAbsolute()) {
       String par = f.getParent();
       if (par == null || pat.equals("*") || pat.equals("**")) {
-         return path.getName().equals(f.getName());
+	 return path.getName().equals(f.getName());
        }
     }
    else if (path.equals(f)) return true;
-   
+
    return false;
 }
 
@@ -214,7 +214,7 @@ public void outputXml(IvyXmlWriter xw)
    xw.field("ID",path_id);
    xw.field("SOURCE",directory_file.getPath());
    if (!is_user) xw.field("TYPE","LIBRARY");
-   else xw.field("TYPE","INCLUDE");
+   else xw.field("TYPE","SOURCE");
    xw.field("NESTED",is_nested);
    if (version_info != null) xw.field("VERSION",version_info);
    for (String p : include_patterns) {
@@ -231,10 +231,24 @@ public void outputXml(IvyXmlWriter xw)
 }
 
 
-}       // end of class LspBasePathSpec
+}	// end of class LspBasePathSpec
 
 
 
 
 /* end of LspBasePathSpec.java */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

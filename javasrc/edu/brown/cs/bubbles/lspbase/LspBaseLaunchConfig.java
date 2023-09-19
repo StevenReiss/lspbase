@@ -46,6 +46,8 @@ class LspBaseLaunchConfig implements LspBaseConstants
 private String config_name;
 private String config_id;
 private int	config_number;
+private String  config_description;
+private String  config_kind;
 private LspBaseProject for_project;
 private LspBaseLaunchConfig original_config;
 private LspBaseLaunchConfig working_copy;
@@ -62,11 +64,13 @@ private static IdCounter launch_counter = new IdCounter();
 /*                                                                              */
 /********************************************************************************/
 
-LspBaseLaunchConfig(LspBaseProject proj,String nm)
+LspBaseLaunchConfig(LspBaseProject proj,String nm,String type,String kind)
 {
    config_name = nm;
    config_number = launch_counter.nextValue();
    config_id = "LAUNCH_" + Integer.toString(config_number);
+   config_description = type;
+   config_kind = kind;
    config_attrs = new HashMap<>();
    is_saved = false;
    working_copy = null;
@@ -80,6 +84,8 @@ LspBaseLaunchConfig(Element xml)
 {
    config_name = IvyXml.getAttrString(xml,"NAME");
    config_number = IvyXml.getAttrInt(xml,"ID");
+   config_kind = IvyXml.getAttrString(xml,"KIND");
+   config_description = IvyXml.getAttrString(xml,"TYPE");
    launch_counter.noteValue(config_number);
    config_id = "LAUNCH_" + Integer.toString(config_number);
    String pnm = IvyXml.getAttrString(xml,"PROJECT_ATTR");
@@ -111,6 +117,8 @@ LspBaseLaunchConfig(String nm,LspBaseLaunchConfig orig)
    config_number = launch_counter.nextValue();
    config_id = "LAUNCH_" + Integer.toString(config_number);
    config_attrs = new HashMap<>(orig.config_attrs);
+   config_kind = orig.config_kind;
+   config_description = orig.config_description;
    for_project = orig.for_project;
    is_saved = false;
    working_copy = null;
@@ -125,6 +133,8 @@ LspBaseLaunchConfig(LspBaseLaunchConfig orig)
    config_number = orig.config_number;
    config_id = orig.config_id;
    config_attrs = new HashMap<>(orig.config_attrs);
+   config_kind = orig.config_kind;
+   config_description = orig.config_description;
    for_project = orig.for_project;
    is_saved = false;
    working_copy = null;
@@ -287,7 +297,8 @@ void outputSaveXml(IvyXmlWriter xw)
    xw.begin("LAUNCH");
    xw.field("NAME",config_name);
    xw.field("ID",config_number);
-   for (Map.Entry<LspBaseConfigAttribute,String> ent : config_attrs.entrySet()) {
+   xw.field("KIND",config_kind);
+   xw.field("TYPE",config_description);  for (Map.Entry<LspBaseConfigAttribute,String> ent : config_attrs.entrySet()) {
       xw.begin("ATTR");
       xw.field("KEY",ent.getKey());
       xw.field("VALUE",ent.getValue());
@@ -306,6 +317,8 @@ void outputBubbles(IvyXmlWriter xw)
    
    xw.begin("CONFIGURATION");
    xw.field("ID",config_id);
+   xw.field("KIND",config_kind);
+   xw.field("TYPE",config_description);
    xw.field("NAME",config_name);
    xw.field("WORKING",!is_saved);
    xw.field("PROJECT",for_project.getName());
@@ -318,9 +331,6 @@ void outputBubbles(IvyXmlWriter xw)
       xw.cdata(ent.getValue());
       xw.end("ATTRIBUTE");
     }
-   xw.begin("TYPE");
-   xw.field("NAME","JS");
-   xw.end("TYPE");
    xw.end("CONFIGURATION");
 }
 

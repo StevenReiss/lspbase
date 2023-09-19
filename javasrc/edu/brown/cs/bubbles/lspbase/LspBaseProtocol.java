@@ -809,7 +809,10 @@ private class MessageReader extends Thread {
             processNotification(id,method,params);
           }
          else {
-            LspLog.logE("Problem with message " + reply.toString(2));
+            String rslt = reply.optString("result",null);
+            if (rslt != null) {
+               LspLog.logE("Problem with message " + reply.toString(2));
+             }
           }
        }
       else {

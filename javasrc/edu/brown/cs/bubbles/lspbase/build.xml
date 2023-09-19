@@ -60,6 +60,8 @@
 	 <fileset dir='${LSPBASE}/java' includes='**/*.class' />
 	 <fileset dir='${LSPBASE}/resources' includes='*.json' />
 	 <fileset dir='${LSPBASE}/resources' includes='*.xml' />
+	 <zipfileset src='${LSPBASE}/lib/snakeyaml-2.0.jar' excludes='META-INF/*' />
+	 <zipfileset src='${LSPBASE}/lib/commonmark.jar' excludes='META-INF/*' />
       </jar>
       <copy file='lspbase.jar' tofile='${BUBBLES}/lib/lspbase.jar' />
    </target>

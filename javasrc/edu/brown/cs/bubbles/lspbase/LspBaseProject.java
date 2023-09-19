@@ -383,7 +383,7 @@ private void addLibraries()
                for (String k : o.keySet()) {
                   Object v = o.get(k);
                   if (v instanceof String) {
-                     toadd.add(new LspBasePathSpec(k,o.toString()));
+                     toadd.add(new LspBasePathSpec(k,v.toString()));
                    }
                   else if (v instanceof Map<?,?>) {
                      Map<?,?> m = (Map<?,?>) v;
@@ -425,6 +425,8 @@ private void addLibraries()
        }
     }
    project_paths.addAll(toadd);
+   
+   saveProject();
 }
 
 
@@ -942,13 +944,12 @@ void handleDeleteResource(String what,String path)
    
    switch (what) {
       case "FILE" :
-         ff = new File(what);
+         ff = new File(path);
          break;
-      case "PROJECT" :
-         // handled by project manager
-         return;
       case "PACKAGE" :
-         // TODO: get directory associated with package
+         LspLog.logD("DELETE PACHAGE " + path);
+         // TODO: get directory associated with package -- might be path
+         break;
       case "CLASS" :
          // TODO: should be handled by finding class and deleting inside a file
          // if the file is all the class, then delete the file

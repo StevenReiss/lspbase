@@ -40,6 +40,9 @@ import javax.swing.text.GapContent;
 import javax.swing.text.Position;
 import javax.swing.text.Segment;
 
+import org.commonmark.node.Node;
+import org.commonmark.parser.Parser;
+import org.commonmark.renderer.html.HtmlRenderer;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.w3c.dom.Element;
@@ -162,12 +165,12 @@ String getContents() {
 
 
 Segment getSegment(int off0,int len)
-{ 
+{
    return getSegment(off0,len,null);
 }
-   
 
-Segment getSegment(int off0,int len,Segment seg)   
+
+Segment getSegment(int off0,int len,Segment seg)
 {
    loadContents();
    if (seg == null) seg = new Segment();
@@ -175,7 +178,7 @@ Segment getSegment(int off0,int len,Segment seg)
       file_contents.getChars(off0,len,seg);
       return seg;
     }
-   catch (BadLocationException e) { 
+   catch (BadLocationException e) {
       LspLog.logE("Bad segment get ",e);
     }
 
@@ -250,10 +253,10 @@ JSONObject getTextDocumentId()
 /********************************************************************************/
 
 synchronized void lockFile(String bid)
-{ 
+{
    while (current_editor != null) {
       try {
-         wait(5000);
+	 wait(5000);
        }
       catch (InterruptedException e) { }
     }
@@ -276,14 +279,14 @@ synchronized void unlockFile()
 int mapLspLineToOffset(int line)
 {
    if (line_offsets == null) setupOffsets();
-   
+
    return line_offsets.findOffset(line+1);
 }
 
 int mapLineToOffset(int line)
 {
    if (line_offsets == null) setupOffsets();
-   
+
    return line_offsets.findOffset(line);
 }
 
@@ -429,12 +432,12 @@ JSONArray getSymbols()
       file_symbols = new JSONArray();
       LspBaseProtocol proto = for_project.getProtocol();
       try {
-         proto.sendWorkMessage("textDocument/documentSymbol",
-               this::handleSymbols,
-               "textDocument",getTextDocumentId());
+	 proto.sendWorkMessage("textDocument/documentSymbol",
+	       this::handleSymbols,
+	       "textDocument",getTextDocumentId());
        }
       catch (LspBaseException e) {
-         LspLog.logE("Problem getting document symbols",e);
+	 LspLog.logE("Problem getting document symbols",e);
        }
       if (for_project.getLanguageData().getCapabilityBool("lsp.fileModule")) {
 	 String nm = for_file.getName();
@@ -525,15 +528,15 @@ void open(String bid) throws LspBaseException
 }
 
 
-void close(String bid) 
+void close(String bid)
 {
    base_ids.remove(bid);
    if (base_ids.isEmpty()) {
       try {
-         for_project.didCloseFile(this);
+	 for_project.didCloseFile(this);
        }
       catch (LspBaseException e) {
-         LspLog.logE("Problem closing file",e);
+	 LspLog.logE("Problem closing file",e);
        }
       file_contents = null;
       file_version = -1;
@@ -550,7 +553,7 @@ void refreshFile() throws LspBaseException
    for_project.didCloseFile(this);
    loadContents();
    for_project.openFile(this);
-   int len = file_contents.length(); 
+   int len = file_contents.length();
    try {
       String txt = file_contents.getString(0,len);
       for (String bid : base_ids) {
@@ -598,55 +601,55 @@ void edit(String bid,int id,List<LspBaseEdit> edits) throws LspBaseException
    int ver = file_version;
 
    Collections.sort(edits);
-   
+
    lockFile(bid);
    try {
       JSONArray changes = new JSONArray();
       try {
-         for (LspBaseEdit edit : edits) {
-            int len = edit.getLength();
-            int off = edit.getOffset();
-            int tlen = 0;
-            String text = edit.getText();
-            String txt = (text == null ? "" : text);
-            LspLog.logD("EDIT BUFFER " + off + " " + len + " " + IvyFormat.formatString(txt));
-            
-            JSONObject rng = proto.createRange(this,off,off+len);
-            JSONObject rchng = createJson("range",rng,"text",txt);
-            changes.put(rchng);
-            
-            if (len > 0) {
-               file_contents.remove(off,len);
-             }
-            if (text != null && text.length() > 0) {
-               file_contents.insertString(off,text);
-               tlen = text.length();
-             }
-            if (file_elider != null) {
-               file_elider.noteEdit(off,len,tlen);
-             }
-            
-            for (String user : base_ids) {
-               if (user.equals(bid)) continue;
-               sendEditToBubbles(user,off,len,txt);
-             }
-            
-            line_offsets.update(off,off+len,text);
-          }
+	 for (LspBaseEdit edit : edits) {
+	    int len = edit.getLength();
+	    int off = edit.getOffset();
+	    int tlen = 0;
+	    String text = edit.getText();
+	    String txt = (text == null ? "" : text);
+	    LspLog.logD("EDIT BUFFER " + off + " " + len + " " + IvyFormat.formatString(txt));
+	
+	    JSONObject rng = proto.createRange(this,off,off+len);
+	    JSONObject rchng = createJson("range",rng,"text",txt);
+	    changes.put(rchng);
+	
+	    if (len > 0) {
+	       file_contents.remove(off,len);
+	     }
+	    if (text != null && text.length() > 0) {
+	       file_contents.insertString(off,text);
+	       tlen = text.length();
+	     }
+	    if (file_elider != null) {
+	       file_elider.noteEdit(off,len,tlen);
+	     }
+	
+	    for (String user : base_ids) {
+	       if (user.equals(bid)) continue;
+	       sendEditToBubbles(user,off,len,txt);
+	     }
+	
+	    line_offsets.update(off,off+len,text);
+	  }
        }
       catch (BadLocationException e) { }
-      
+
       chng = is_changed;
       is_changed = true;
       clearSymbols();
       ver = ++file_version;
       proto.sendMessage("textDocument/didChange",
-            "textDocument",getTextDocumentId(),"contentChanges",changes);
+	    "textDocument",getTextDocumentId(),"contentChanges",changes);
     }
    finally {
       unlockFile();
     }
-   
+
    LspBaseMain lsp = LspBaseMain.getLspMain();
    if (!chng) {
       IvyXmlWriter mxw = lsp.beginMessage("FILECHANGE");
@@ -777,7 +780,7 @@ private class IndentChecker implements LspArrayResponder {
 	 JSONObject range = ed.getJSONObject("range");
 	 int lstart = mapRangeToStartOffset(range);
 	 int lend = mapRangeToEndOffset(range);
-	
+
 	 if (txt != null && txt.length() >= 1 && txt.charAt(0) == '\n') {
 	    if (line_start > lstart && line_start <= lend && lend < line_end) {
 	       add_indent = txt.length() - (lend-lstart);
@@ -832,49 +835,49 @@ void fixIndents(String bif,int id,int offset,IvyXmlWriter xw)
 private class IndentFixer implements LspArrayResponder {
 
    private JSONArray indent_edits;
-   
+
    IndentFixer() {
       indent_edits = new JSONArray();
     }
-   
+
    JSONArray getIndentEdits() {
       if (indent_edits.length() == 0) return null;
       return indent_edits;
     }
-   
+
    @Override public void handleResponse(JSONArray edits) {
       for (int i = 0; i < edits.length(); ++i) {
-         JSONObject edit = edits.getJSONObject(i);
-         String txt = edit.optString("newText");
-         if (txt.length() == 0) txt = null;
-         JSONObject range = edit.getJSONObject("range");
-         LineCol startlc = mapRangeToStartLspLineCol(range);
-         LineCol endlc = mapRangeToEndLspLineCol(range);
-         if (txt != null && txt.length() >= 1 && txt.charAt(0) == '\n') {
-            if (startlc.getLine()+1 == endlc.getLine() && txt.trim().equals("")) {
-               indent_edits.put(edit);
-             }
-          }
-         else if (txt == null && startlc.getLine() == endlc.getLine()) {
-            int lstart = mapLspLineToOffset(startlc.getLine());
-            int lend = mapRangeToEndOffset(range);
-            String repl = getText(lstart,lend-lstart);
-            if (repl.trim().equals("")) {
-               indent_edits.put(edit);
-             }
-          }
+	 JSONObject edit = edits.getJSONObject(i);
+	 String txt = edit.optString("newText");
+	 if (txt.length() == 0) txt = null;
+	 JSONObject range = edit.getJSONObject("range");
+	 LineCol startlc = mapRangeToStartLspLineCol(range);
+	 LineCol endlc = mapRangeToEndLspLineCol(range);
+	 if (txt != null && txt.length() >= 1 && txt.charAt(0) == '\n') {
+	    if (startlc.getLine()+1 == endlc.getLine() && txt.trim().equals("")) {
+	       indent_edits.put(edit);
+	     }
+	  }
+	 else if (txt == null && startlc.getLine() == endlc.getLine()) {
+	    int lstart = mapLspLineToOffset(startlc.getLine());
+	    int lend = mapRangeToEndOffset(range);
+	    String repl = getText(lstart,lend-lstart);
+	    if (repl.trim().equals("")) {
+	       indent_edits.put(edit);
+	     }
+	  }
        }
     }
 
-}       // end of inner class IndentFixer
+}	// end of inner class IndentFixer
 
 
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      FORMATCODE                                                              */
-/*                                                                              */
+/*										*/
+/*	FORMATCODE								*/
+/*										*/
 /********************************************************************************/
 
 void formatCode(String bid,int soffset,int eoffset,IvyXmlWriter xw)
@@ -882,19 +885,19 @@ void formatCode(String bid,int soffset,int eoffset,IvyXmlWriter xw)
 {
    LspBaseProtocol proto = getProject().getProtocol();
    JSONObject opts = createJson("tabSize",getTabSize(),
-         "insertSpaces",true,"trimTrailingWhiteSpace",true,
-         "insertFinalNewLine",false,"trimFInalNewlines",true);
+	 "insertSpaces",true,"trimTrailingWhiteSpace",true,
+	 "insertFinalNewLine",false,"trimFInalNewlines",true);
    FormatFixer fixer = new FormatFixer();
    if (soffset == 0 || eoffset <= soffset) {
       proto.sendMessage("textDocument/formatting",fixer,
-            "textDocument",getTextDocumentId(),
-            "options",opts);
+	    "textDocument",getTextDocumentId(),
+	    "options",opts);
     }
    else {
       proto.sendMessage("textDocument/rangeFormatting",fixer,
-            "textDocument",getTextDocumentId(),
-            "range",proto.createRange(this,soffset,eoffset),
-            "options",opts); 
+	    "textDocument",getTextDocumentId(),
+	    "range",proto.createRange(this,soffset,eoffset),
+	    "options",opts);
     }
    if (!fixer.madeEdits()) throw new LspBaseException("Problem with formatting");
 }
@@ -904,24 +907,97 @@ void formatCode(String bid,int soffset,int eoffset,IvyXmlWriter xw)
 private class FormatFixer implements LspArrayResponder {
 
    private boolean made_edits;
-   
+
    FormatFixer() {
       made_edits = false;
     }
-   
-   boolean madeEdits()                  { return made_edits; }
-   
+
+   boolean madeEdits()			{ return made_edits; }
+
    @Override public void handleResponse(JSONArray edits) {
       try {
-         edit("*FORMAT",0,edits);
+	 edit("*FORMAT",0,edits);
        }
       catch (LspBaseException e) {
-         LspLog.logE("Problem with formatting edits",e);
+	 LspLog.logE("Problem with formatting edits",e);
        }
     }
-   
-}       // end of inner class FormatFixer
 
+}	// end of inner class FormatFixer
+
+
+
+
+/********************************************************************************/
+/*										*/
+/*	Handle HOVERDATA requests						*/
+/*										*/
+/********************************************************************************/
+
+void hoverData(String bid,int soffset,int eoffset,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseProtocol proto = getProject().getProtocol();
+   HoverResponse fixer = new HoverResponse();
+   proto.sendMessage("textDocument/hover",fixer,
+	 "textDocument",getTextDocumentId(),
+	 "position",proto.createPosition(this,soffset));
+
+   String rslt = fixer.getHoverHtml();
+   if (rslt != null) {
+      xw.cdataElement("HOVER",rslt);
+    }
+
+}
+
+
+private class HoverResponse implements LspJsonResponder {
+
+   private String hover_text;
+
+   HoverResponse() {
+      hover_text = null;
+    }
+
+   String getHoverHtml()			{ return hover_text; }
+
+   @Override public void handleResponse(JSONObject hover) {
+      if (hover == null) return;
+      Object rslt = hover.opt("contents");
+//    JSONObject rng = hover.optJSONObject("range");
+      String markdown = null;
+      if (rslt == null) ;
+      else if (rslt instanceof String) {
+	 markdown = rslt.toString();
+       }
+      else if (rslt instanceof JSONArray) {
+	 JSONArray jarr = (JSONArray) rslt;
+	 LspLog.logD("Found hover array");
+	 for (int i = 0; i < jarr.length(); ++i) {
+	    if (markdown == null) markdown = jarr.getString(i);
+	    else markdown += "\n" + jarr.getString(i);
+	  }
+       }
+      else if (rslt instanceof JSONObject) {
+	 JSONObject mup = (JSONObject) rslt;
+//	 String kind = mup.getString("kind");
+	 String val = mup.getString("value");
+	 markdown = val;
+       }
+      else {
+	 LspLog.logE("Unknown hover result " + rslt);
+       }
+      if (markdown != null) {
+	 Parser p = Parser.builder().build();
+	 Node document = p.parse(markdown);
+	 HtmlRenderer renderer = HtmlRenderer.builder().build();
+	 String text = renderer.render(document);
+	 if (text != null && text.startsWith("<p>")) text = text.substring(3);
+	 hover_text = text;
+       }
+    }
+
+}
 
 
 /********************************************************************************/
@@ -1113,7 +1189,7 @@ private class TokenHolder implements LspJsonResponder {
 	 int len = arr.getInt(i+2);
 	 int soff = mapLspLineCharToOffset(line,col);
 	 int eoff = soff + len;
-	
+
 	 String typ = token_types[arr.getInt(i+3)];
 	 String cnt = getText(soff,eoff-soff);
 	 Set<String> modset = new HashSet<>();
@@ -1128,7 +1204,7 @@ private class TokenHolder implements LspJsonResponder {
 	     }
 	  }
 	 LspLog.logD("REGION-TOKEN " + line + " " + col + " " + len + " " + typ + " " + mods + " " + cnt);
-	
+
 	 if (line != lastline && (typ == "keyword" || typ == "function")) {
 	    switch (cnt) {
 	       case "import" :
@@ -1194,14 +1270,14 @@ boolean commit(boolean refresh,boolean save,boolean compile)
 /*										*/
 /********************************************************************************/
 
-Position createPosition(int offset) 
+Position createPosition(int offset)
 {
    if (file_version <= 0) {
       try {
-         open(null);
+	 open(null);
        }
-      catch (LspBaseException e) { 
-         LspLog.logE("Problem opening file to create position",e);
+      catch (LspBaseException e) {
+	 LspLog.logE("Problem opening file to create position",e);
        }
     }
    try {
@@ -1234,26 +1310,26 @@ private class AutoCompile implements Runnable {
       if (delay < 0) return;
       if (file_version != edit_version) return;
       try {
-	 Thread.sleep(delay);
+         Thread.sleep(delay);
        }
       catch (InterruptedException e) { }
       if (file_version != edit_version) return;
-
+   
       // get messages for file if that is necessary -- might be automatic
-
+   
       if (file_version != edit_version) return;
       if (getProject().getAutoElide(bubbles_id) && file_elider != null) {
-	 LspBaseMain lsp = LspBaseMain.getLspMain();
-	 IvyXmlWriter xw = lsp.beginMessage("ELISION",bubbles_id);
-	 xw.field("FILE",for_file.getPath());
-	 xw.field("ID",edit_version);
-	 xw.begin("ELISION");
+         LspBaseMain lsp = LspBaseMain.getLspMain();
+         IvyXmlWriter xw = lsp.beginMessage("ELISION",bubbles_id);
+         xw.field("FILE",for_file.getPath());
+         xw.field("ID",edit_version);
+         xw.begin("ELISION");
          try {
             if (file_elider.computeElision(xw)) {
                if (file_version == edit_version) {
-                  xw.end("ELISION");
-                  lsp.finishMessage(xw);
-                }
+        	  xw.end("ELISION");
+        	  lsp.finishMessage(xw);
+        	}
              }
           }
          catch (LspBaseException e) {
@@ -1420,26 +1496,26 @@ private class CodeActions implements LspArrayResponder {
    @Override public void handleResponse(JSONArray cacts) {
       int len = cacts.length();
       for (int i = 0; i < len; ++i) {
-         JSONObject cact = cacts.getJSONObject(i);
-         String kind = cact.optString("kind",null);
-         if (kind == null) continue;
-         if (kind.equals("quickfix.create.method")) continue;
-         if (cact.optJSONObject("disabled") != null) continue;
-         if (cact.optJSONObject("command") != null) continue;
-         JSONObject edit = cact.optJSONObject("edit");
-         if (!isValidEdit(edit)) continue;
-         
-         int rel = (len - i)*10;
-         if (cact.optBoolean("isPreferred")) rel += len*10;
-         
-         xml_writer.begin("FIX");
-         xml_writer.field("RELEVANCE",rel);
-         xml_writer.field("DISPLAY",cact.getString("title"));
-         xml_writer.field("ID",cact.hashCode());
-         JSONArray edits = edit.getJSONArray("documentChanges");
-         JSONArray editl = edits.getJSONObject(0).getJSONArray("edits");
-         LspBaseUtil.outputTextEdit(LspBaseFile.this,editl,xml_writer);
-         xml_writer.end("FIX");
+	 JSONObject cact = cacts.getJSONObject(i);
+	 String kind = cact.optString("kind",null);
+	 if (kind == null) continue;
+	 if (kind.equals("quickfix.create.method")) continue;
+	 if (cact.optJSONObject("disabled") != null) continue;
+	 if (cact.optJSONObject("command") != null) continue;
+	 JSONObject edit = cact.optJSONObject("edit");
+	 if (!isValidEdit(edit)) continue;
+	
+	 int rel = (len - i)*10;
+	 if (cact.optBoolean("isPreferred")) rel += len*10;
+	
+	 xml_writer.begin("FIX");
+	 xml_writer.field("RELEVANCE",rel);
+	 xml_writer.field("DISPLAY",cact.getString("title"));
+	 xml_writer.field("ID",cact.hashCode());
+	 JSONArray edits = edit.getJSONArray("documentChanges");
+	 JSONArray editl = edits.getJSONObject(0).getJSONArray("edits");
+	 LspBaseUtil.outputTextEdit(LspBaseFile.this,editl,xml_writer);
+	 xml_writer.end("FIX");
        }
     }
 
@@ -1448,15 +1524,15 @@ private class CodeActions implements LspArrayResponder {
       JSONArray changes = edit.optJSONArray("documentChanges");
       if (changes == null || changes.length() == 0) return false;
       for (int i = 0; i < changes.length(); ++i) {
-         JSONObject chng = changes.getJSONObject(i);
-         String kind = chng.optString("kind",null);
-         LspLog.logD("CHANGE KIND " + kind);
-         // only allow edits for now
-         if (kind != null) return false;
-         JSONObject file = chng.getJSONObject("textDocument");
-         String uri = file.getString("uri");
-         LspLog.logD("MATCH URI " + uri + " " + getUri());
-         if (!uri.equals(getUri())) return false;
+	 JSONObject chng = changes.getJSONObject(i);
+	 String kind = chng.optString("kind",null);
+	 LspLog.logD("CHANGE KIND " + kind);
+	 // only allow edits for now
+	 if (kind != null) return false;
+	 JSONObject file = chng.getJSONObject("textDocument");
+	 String uri = file.getString("uri");
+	 LspLog.logD("MATCH URI " + uri + " " + getUri());
+	 if (!uri.equals(getUri())) return false;
        }
       return true;
     }
@@ -1493,28 +1569,28 @@ void fixImports(String bid,int demand,int staticdemand,String order,
 private class ImmediateActions implements LspArrayResponder {
 
    ImmediateActions() { }
-   
+
    @Override public void handleResponse(JSONArray cacts) {
       LspBaseMain lsp = LspBaseMain.getLspMain();
       LspBaseProjectManager lpm = lsp.getProjectManager();
       int len = cacts.length();
       for (int i = 0; i < len; ++i) {
-         JSONObject cact = cacts.getJSONObject(i);
-         String kind = cact.optString("kind",null);
-         if (kind == null) continue;
-         if (kind.equals("quickfix.create.method")) continue;
-         if (cact.optJSONObject("disabled") != null) continue;
-         if (cact.optJSONObject("command") != null) continue;
-         JSONObject wsedit = cact.optJSONObject("edit");
-         try {
-            lpm.applyWorkspaceEdit(wsedit);
-          }
-         catch (LspBaseException e) {
-            LspLog.logE("Problem with immediate action edit",e);
-          }
+	 JSONObject cact = cacts.getJSONObject(i);
+	 String kind = cact.optString("kind",null);
+	 if (kind == null) continue;
+	 if (kind.equals("quickfix.create.method")) continue;
+	 if (cact.optJSONObject("disabled") != null) continue;
+	 if (cact.optJSONObject("command") != null) continue;
+	 JSONObject wsedit = cact.optJSONObject("edit");
+	 try {
+	    lpm.applyWorkspaceEdit(wsedit);
+	  }
+	 catch (LspBaseException e) {
+	    LspLog.logE("Problem with immediate action edit",e);
+	  }
        }
     }
-   
+
 }	// end of inner class ImmediateActions
 
 
@@ -1535,9 +1611,9 @@ void rename(int soffset,int eoffset,String name,String handle,String newname,
    Renamer renamer = new Renamer(xw);
    try {
       proto.sendWorkMessage("textDocument/rename",renamer,
-            "textDocument",getTextDocumentId(),
-            "position",pos,
-            "newName", newname);
+	    "textDocument",getTextDocumentId(),
+	    "position",pos,
+	    "newName", newname);
     }
    catch (LspBaseException e) {
       xw.begin("FAILURE");
@@ -1560,18 +1636,18 @@ private class Renamer implements LspJsonResponder {
       LspBaseMain lsp = LspBaseMain.getLspMain();
       LspBaseProjectManager lpm = lsp.getProjectManager();
       if (wsedit.isNull("documentChanges")) {
-         xml_writer.begin("FAILURE");
-         xml_writer.field("TYPE","NOCHANGE");
-         xml_writer.end("FAILURE");
+	 xml_writer.begin("FAILURE");
+	 xml_writer.field("TYPE","NOCHANGE");
+	 xml_writer.end("FAILURE");
        }
       else {
-         try {
-            lpm.applyWorkspaceEdit(wsedit);
-          }
-         catch (LspBaseException e) {
-            LspLog.logE("Problem applying edits",e);
-          }
-         xml_writer.emptyElement("EDITS");
+	 try {
+	    lpm.applyWorkspaceEdit(wsedit);
+	  }
+	 catch (LspBaseException e) {
+	    LspLog.logE("Problem applying edits",e);
+	  }
+	 xml_writer.emptyElement("EDITS");
        }
     }
 
@@ -1625,12 +1701,12 @@ private class CreatePrivateBufferTask implements Runnable {
       PrivateBuffer pbf = private_buffers.get(buffer_pid);
       if (pbf == null) return;
       JSONObject docitm = createJson("uri",pbf.getPrivateUri(),"languageId",file_language,
-            "version",pbf.getVersion(),"text",pbf.getBufferContents());
+	    "version",pbf.getVersion(),"text",pbf.getBufferContents());
       try {
-         proto.sendMessage("textDocument/didOpen","textDocument",docitm);
+	 proto.sendMessage("textDocument/didOpen","textDocument",docitm);
        }
       catch (LspBaseException e) {
-         LspLog.logE("Problem opening private buffer",e);
+	 LspLog.logE("Problem opening private buffer",e);
        }
     }
 
@@ -1692,7 +1768,7 @@ private class PrivateBuffer {
    private String buffer_name;
    private File file_name;
    private int version_id;
-   
+
 
    PrivateBuffer(String pid,String frompid) throws LspBaseException {
       buffer_name = pid;
@@ -1700,13 +1776,13 @@ private class PrivateBuffer {
       String txt = null;
       if (frompid == null) txt = getContents();
       else {
-         PrivateBuffer pbf = findPrivateBuffer(frompid);
-         if (pbf == null) throw new LspBaseException("Private buffer " + pbf + " not found");
-         txt = pbf.getBufferContents();
+	 PrivateBuffer pbf = findPrivateBuffer(frompid);
+	 if (pbf == null) throw new LspBaseException("Private buffer " + pbf + " not found");
+	 txt = pbf.getBufferContents();
        }
       LspLog.logD("PRIVATE BUFFER CONTENTS: " + txt);
       try {
-         buffer_text.insertString(0,txt);
+	 buffer_text.insertString(0,txt);
        }
       catch (BadLocationException e) { }
       String fnm = getPath();
@@ -1718,16 +1794,16 @@ private class PrivateBuffer {
     }
 
    String getPrivateUri()		{ return getUri(file_name); }
-   
-   int getVersion()                     { return version_id; }
-   int noteEdit()                       { return ++version_id; }
+
+   int getVersion()			{ return version_id; }
+   int noteEdit()			{ return ++version_id; }
 
    String getBufferContents() {
       try {
-         return buffer_text.getString(0,buffer_text.length());
+	 return buffer_text.getString(0,buffer_text.length());
        }
       catch (BadLocationException e) {
-         LspLog.logE("Problem getting buffer contents " + e);
+	 LspLog.logE("Problem getting buffer contents " + e);
        }
       return "";
     }

@@ -134,7 +134,9 @@ void handleCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
       case "NEWRUNCONFIG" :
 	 getNewRunConfiguration(proj,
 	       IvyXml.getAttrString(xml,"NAME"),
-	       IvyXml.getAttrString(xml,"CLONE"),xw);
+	       IvyXml.getAttrString(xml,"CLONE"),
+               IvyXml.getAttrString(xml,"TYPE"),
+               IvyXml.getAttrString(xml,"KIND"),xw);
 	 break;
       case "EDITRUNCONFIG" :
 	 editRunConfiguration(IvyXml.getAttrString(xml,"LAUNCH"),
@@ -382,7 +384,7 @@ private void getDevices(IvyXmlWriter xw)
 /*										*/
 /********************************************************************************/
 
-void getNewRunConfiguration(String proj,String name,String clone,IvyXmlWriter xw)
+void getNewRunConfiguration(String proj,String name,String clone,String type,String kind,IvyXmlWriter xw)
    throws LspBaseException
 {
    LspBaseLaunchConfig plc = null;
@@ -396,7 +398,7 @@ void getNewRunConfiguration(String proj,String name,String clone,IvyXmlWriter xw
    else {
       LspBaseProject lspproj = lsp_base.getProjectManager().findProject(proj);
       if (name == null) name = getUniqueName("New Launch");
-      plc = new LspBaseLaunchConfig(lspproj,name);
+      plc = new LspBaseLaunchConfig(lspproj,name,type,kind);
     }
 
    if (plc != null) {

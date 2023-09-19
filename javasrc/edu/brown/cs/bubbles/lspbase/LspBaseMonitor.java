@@ -216,7 +216,7 @@ private String handleCommand(String cmd,String proj,Element xml) throws LspBaseE
       case "GETHOST" :
 	 handleGetHost(xw);
 	 break;
-      case "LAUNCHES" :
+      case "LANGUAGEDATA" :
 	 getLanguageData(proj,xw);
 	 break;
          
@@ -256,6 +256,7 @@ private String handleCommand(String cmd,String proj,Element xml) throws LspBaseE
       case "FORMATCODE" :
       case "DELETE" :
       case "RENAMERESOURCE" :
+      case "HOVERDATA" :
          lsp_base.getProjectManager().handleEditCommand(cmd,proj,xml,xw);
          break;
       case "LAUNCHQUERY" :

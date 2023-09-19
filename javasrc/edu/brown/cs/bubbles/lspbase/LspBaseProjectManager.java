@@ -201,6 +201,12 @@ LspBaseFile findFile(String proj,String file)
 
 
 
+void deleteProject(LspBaseProject proj)
+{
+   // TOOO: handle delete project
+}
+
+
 
 /********************************************************************************/
 /*										*/
@@ -438,6 +444,12 @@ void handleEditCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
          handleRenameResource(proj,IvyXml.getAttrString(xml,"BID","*"),
                IvyXml.getAttrString(xml,"FILE"),
                IvyXml.getAttrString(xml,"NEWNAME"),xw);
+         break;
+      case "HOVERDATA" :
+         handleHoverData(proj,IvyXml.getAttrString(xml,"BID","*"),
+               IvyXml.getAttrString(xml,"FILE"),
+               IvyXml.getAttrInt(xml,"START"),
+               IvyXml.getAttrInt(xml,"END"),xw);
          break;
     }
 }
@@ -765,6 +777,22 @@ void handleFormatCode(String proj,String bid,String file,
 
 /********************************************************************************/
 /*                                                                              */
+/*      Handle HOVERDATA command                                                */
+/*                                                                              */
+/********************************************************************************/
+
+void handleHoverData(String proj,String bid,String file,
+      int start,int end,IvyXmlWriter xw)
+   throws LspBaseException
+{
+   LspBaseFile lbf = findFile(proj,file);
+   if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
+   lbf.hoverData(bid,start,end,xw);
+}
+
+
+/********************************************************************************/
+/*                                                                              */
 /*      Handle DELETE (resource)                                                */
 /*                                                                              */
 /********************************************************************************/
@@ -773,7 +801,8 @@ void handleDeleteResource(String proj,String what,String path)
       throws LspBaseException
 {
    if (what.equals("PROJECT")) {
-      // TODO: handle delete project
+      LspBaseProject lbp = findProject(proj);
+      if (lbp != null) deleteProject(lbp);
     }
    else {
       LspBaseProject lbp = findProject(proj);
