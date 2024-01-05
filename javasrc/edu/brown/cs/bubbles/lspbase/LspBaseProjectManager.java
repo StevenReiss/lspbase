@@ -507,6 +507,8 @@ void handleBuildProject(String proj,boolean clean,boolean full,boolean refresh,I
    if (p == null) throw new LspBaseException("Unknown project " + proj);
 
    p.build(refresh,true);
+   
+   xw.field("DEFERERRORS",true);
 }
 
 

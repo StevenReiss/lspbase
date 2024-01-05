@@ -126,7 +126,8 @@ void addResult(JSONObject data,String what)
 
 void addResults(Object data,String what)
 {
-   if (data instanceof JSONArray) addResults((JSONArray) data,what);
+   if (data == null) return;
+   else if (data instanceof JSONArray) addResults((JSONArray) data,what);
    else if (data instanceof JSONObject) addResult((JSONObject) data,what);
 }
 

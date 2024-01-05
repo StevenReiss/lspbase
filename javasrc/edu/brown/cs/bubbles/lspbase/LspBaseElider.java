@@ -74,6 +74,8 @@ private boolean slashstar_comments;
 private boolean pound_comments;
 private boolean text_blocks;            // using triple quotes
 private boolean backquote_blocks;
+private Segment file_contents;
+
 
 
 
@@ -102,6 +104,7 @@ LspBaseElider(LspBaseFile file)
 {
    for_file = file;
    elide_rdata = new TreeSet<>();
+   file_contents = file.getSegment(0,file.getLength());
    
    Object prop = file.getProject().getLanguageData().getCapability(TOKEN_TYPES);
    JSONArray jarr = (JSONArray) prop;
@@ -166,14 +169,17 @@ void noteEdit(int soff,int len,int rlen)
 
 boolean computeElision(IvyXmlWriter xw) throws LspBaseException
 { 
+   LspLog.logD("ELISION START " + scan_braces + " " + scan_calls);
    ElideData data = new ElideData();
    
    LspBaseProject lbp = for_file.getProject();
    LspBaseProtocol proto = lbp.getProtocol();
+   LspLog.logD("ELISION FOLDS");
    FoldResponder fr = new FoldResponder(data);
    proto.sendWorkMessage("textDocument/foldingRange",fr,
          "textDocument",for_file.getTextDocumentId());
    
+   LspLog.logD("ELISION DECLS");
    handleDecls(data,for_file.getSymbols(),null);
 // proto.sendMessage("textDocument/documentSymbol",
 //       (Object resp,JSONObject err) -> handleDecls(data,resp,err),
@@ -186,13 +192,17 @@ boolean computeElision(IvyXmlWriter xw) throws LspBaseException
          textdata = for_file.getSegment(range.getStartOffset(),
                range.getEndOffset()-range.getStartOffset());
        }
+      LspLog.logD("ELISION TOKENS");
       TokenResponder tr = new TokenResponder(data,range,textdata);
       proto.sendWorkMessage("textDocument/semanticTokens/range",tr,
             "textDocument",for_file.getTextDocumentId(),
             "range",proto.createRange(for_file,range.getStartOffset(),
                   range.getEndOffset()));
       
-      if (scan_braces) scanBraces(data,range.getStartOffset(),range.getEndOffset(),textdata);
+      if (scan_braces) {
+         LspLog.logD("ELISION BRACES");
+         scanBraces(data,range.getStartOffset(),range.getEndOffset(),textdata);
+       }
     }
    
    data.outputElision(xw);
@@ -251,9 +261,14 @@ void handleFolds(ElideData data,JSONArray folds)
       JSONObject fold = folds.getJSONObject(i);
       int soff = for_file.mapLspLineToOffset(fold.getInt("startLine"));
       int eoff = for_file.mapLspLineCharToOffset(fold.getInt("endLine"),
-            fold.getInt("endCharacter")) + 1;
+            fold.optInt("endCharacter",0)) + 1;
       if (!data.isRelevant(soff,eoff)) continue;
-      String kind = fold.optString("kind","region");
+      eoff = fixFoldEndOffset(fold,soff,eoff);
+      String kind = fold.optString("kind","other");
+      LspLog.logD("ELISION FOLD " + soff + " " + eoff + " " + kind + " " + 
+            fold.getInt("startLine") + " " + fold.optInt("startCharacter",0) + " " +
+            fold.getInt("endLine") + " " + fold.optInt("endCharacter",0));
+                  
       String typ = null;
       switch (kind) {
          case "imports" :
@@ -264,10 +279,30 @@ void handleFolds(ElideData data,JSONArray folds)
          case "region" :
             typ = "STMT";
             break;
+         default :
+            continue;                           // might want type = stmt or ignore
        }
-      ElideNode en = data.addNode(soff,eoff);
-      if (typ != null) en.setNodeType(typ);
+      data.addNode(soff,eoff,typ,null);
     }
+}
+
+
+private int fixFoldEndOffset(JSONObject fold,int soff,int eoff)
+{
+   int scol = fold.optInt("startCharacter",0)+1;
+   char prevch = file_contents.charAt(soff+scol-1);
+   if (prevch == '\n' && scol > 0) {
+      char prevech = file_contents.charAt(eoff-1);
+      if (prevech == '\n') {
+         for (int i = eoff; i < file_contents.length(); ++i) {
+            char ch = file_contents.charAt(i);
+            if (ch == '\n') {
+               return i+1;
+             }
+          }
+       }
+    }
+   return eoff;
 }
 
 
@@ -302,8 +337,7 @@ private void handleDecl(ElideData data,JSONObject decl)
    String ntype = ElideDeclTypes[decl.getInt("kind")];
    if (ntype == null) return;
    
-   ElideNode en = data.addNode(soff,eoff);
-   en.setNodeType(ntype);
+   ElideNode en = data.addNode(soff,eoff,ntype,null);
    // TODO:  get File prefix and add it to name
    String name = decl.getString("name");
    String det = decl.optString("detail","");
@@ -356,7 +390,7 @@ void handleTokens(ElideData edata,ElideRange range,Segment textdata,JSONArray ar
           }
        }
          
-      ElideNode en = edata.addNode(soff,eoff);
+      ElideNode en = edata.addNode(soff,eoff,null,null);
       en.setSymbolType(st);  
       if (st.contains("DECL")) {
          ElideNode par = en.getParent();
@@ -536,10 +570,7 @@ private int skipString(int idx,char c0,Segment text)
 
 private ElideNode addScanBlock(ElideData edata,int soff,int eoff,String nodetype)
 {
-   ElideNode en = edata.addNode(soff,eoff);
-   if (en == null) return null;
-   en.setNodeType(nodetype);
-   
+   ElideNode en = edata.addNode(soff,eoff,nodetype,null);
    return en;
 }
 
@@ -762,16 +793,18 @@ private class ElideNode implements Comparable<ElideNode>, LspJsonResponder {
    private JSONObject signature_data;
    private int hint_location;
    
-   ElideNode(int start,int end) {
+   ElideNode(int start,int end,String type,String stype) {
       start_offset = start;
       end_offset = end;
       node_priority = 1.0;
       child_nodes = null;
-      node_type = null;
-      symbol_type = null;
+      node_type = type;
+      symbol_type = stype;
       symbol_name = null;
       parent_node = null;
       hint_location = -1;
+      
+      LspLog.logD("CREATE NODE " + type + " " + stype + " " +  start + " " + end);
     }
   
    int getStartOffset()                         { return start_offset; }
@@ -811,8 +844,10 @@ private class ElideNode implements Comparable<ElideNode>, LspJsonResponder {
                LspLog.logE("Overlapping node add " + start + " " + end + " " +
                      cn.start_offset + " " + cn.end_offset);
                // overlap -- ignore; first restore any removed children
-               for (ElideNode en1 : cn.child_nodes) {
-                  addChild(en1);
+               if (cn.child_nodes != null) {
+                  for (ElideNode en1 : cn.child_nodes) {
+                     addChild(en1);
+                   }
                 }
                return null;
              }
@@ -924,7 +959,7 @@ private class ElideData {
    private ElideNode root_node;
    
    ElideData() {
-      root_node = new ElideNode(0,for_file.getLength());
+      root_node = new ElideNode(0,for_file.getLength(),null,null);
       root_node.setNodeType("FILE");
       elide_ranges = computeRanges();
     }
@@ -938,8 +973,8 @@ private class ElideData {
       return false;
     }
    
-   ElideNode addNode(int start,int end) { 
-      ElideNode child = new ElideNode(start,end);
+   ElideNode addNode(int start,int end,String nodetype,String symtype) { 
+      ElideNode child = new ElideNode(start,end,nodetype,symtype);
       root_node.addNode(child,start,end);
       return child;
     }

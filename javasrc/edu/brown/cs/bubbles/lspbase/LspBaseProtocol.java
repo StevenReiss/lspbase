@@ -503,6 +503,11 @@ void processReply(int id,Object cnts)
          LspArrayResponder alsp = (LspArrayResponder) lsp;
          alsp.handleResponse(jcnts);
        }
+      else if (lsp != null && lsp instanceof LspAnyResponder) {
+         LspAnyResponder alsp = (LspAnyResponder) lsp;
+         if (cnts == JSONObject.NULL) cnts = null;
+         alsp.handleResponse(cnts);
+       }
    }
    catch (Throwable t) {
       LspLog.logE("Problem processing response",t);
@@ -816,6 +821,7 @@ private class MessageReader extends Thread {
           }
        }
       else {
+         LspLog.logD("Handle reply: " + id + "\n" + reply.toString(2));
          processReply(id,reply.opt("result"));
        }
     }

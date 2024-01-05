@@ -439,7 +439,7 @@ private static class ExceptionBreakpoint extends LspBaseBreakpoint
    @Override protected void outputLocalXml(IvyXmlWriter xw) {
       xw.field("ISCAUGHT",is_caught);
       xw.field("ISUNCAUGHT",is_uncaught);
-      xw.field("PROJECT",for_project.getName());
+      if (for_project != null) xw.field("PROJECT",for_project.getName());
       if (exception_name != null) xw.field("NAME",exception_name);
     }
    

@@ -772,7 +772,7 @@ void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolea
    
    if (refs) {
       use_protocol.sendWorkMessage("textDocument/references",
-            (JSONArray data) -> rslt.addResults(data,"REFS"),
+            new FindResponder(rslt,"REFS"),
             "textDocument",file.getTextDocumentId(),
             "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()),
             "context",createJson("includeDeclaration",defs));
@@ -780,7 +780,7 @@ void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolea
    
    if (ronly || wonly) {
       use_protocol.sendWorkMessage("textDocument/documentHighlight",
-            (Object data) -> rslt.addResults(data,"HIGH"),
+            new FindResponder(rslt,"HIGH"),
             "textDocument",file.getTextDocumentId(),
             "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
     }
@@ -788,19 +788,19 @@ void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolea
    if (!type) {
       if (getLanguageData().getCapability("declarationProvider") != null) {
          use_protocol.sendWorkMessage("textDocument/declaration",
-               (Object data) -> rslt.addResults(data,"DECL"),
+               new FindResponder(rslt,"DECL"),
                "textDocument",file.getTextDocumentId(),
                "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
        }
       
       use_protocol.sendWorkMessage("textDocument/definition",
-            (Object data) -> rslt.addResults(data,"DEFS"),
+            new FindResponder(rslt,"DEFS"),
             "textDocument",file.getTextDocumentId(),
             "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
     }
    else {
       use_protocol.sendWorkMessage("textDocument/typeDefinition",
-            (Object data) -> rslt.addResults(data,"TYPE"),
+            new FindResponder(rslt,"TYPE"),
             "textDocument",file.getTextDocumentId(),
             "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn())); 
     }
@@ -808,7 +808,7 @@ void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolea
    if (impls) {
       // might need to be done before definitions?
       use_protocol.sendWorkMessage("textDocument/implementation",
-            (Object data) -> rslt.addResults(data,"IMPL"),
+            new FindResponder(rslt,"IMPL"),
             "textDocument",file.getTextDocumentId(),
             "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn())); 
     }
@@ -858,6 +858,24 @@ void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolea
 
 
 
+private static class FindResponder implements LspAnyResponder {
+   
+   private LspBaseFindResult find_result;
+   private String find_type;
+   
+   FindResponder(LspBaseFindResult rslt,String type) {
+      find_result = rslt;
+      find_type = type;
+    }
+   
+   @Override public void handleResponse(Object cnts) {
+      if (cnts == null || cnts == JSONObject.NULL) return;
+      find_result.addResults(cnts,find_type);
+    }
+}
+
+
+
 
 /********************************************************************************/
 /*                                                                              */
@@ -872,7 +890,7 @@ void fullyQualifiedName(LspBaseFile file,int start,int end,IvyXmlWriter xw)
    LspBaseFindResult rslt = new LspBaseFindResult(this,file,true,false,
          false,false,false,false);
    use_protocol.sendMessage("textDocument/definition",
-         (Object data) -> rslt.addResults(data,"DEFS"),
+         new FindResponder(rslt,"DEFS"),
          "textDocument",file.getTextDocumentId(),
          "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
    for (FindResult fr : rslt.getResults()) {

@@ -321,7 +321,7 @@ void outputBubbles(IvyXmlWriter xw)
    xw.field("TYPE",config_description);
    xw.field("NAME",config_name);
    xw.field("WORKING",!is_saved);
-   xw.field("PROJECT",for_project.getName());
+   if (for_project != null) xw.field("PROJECT",for_project.getName());
    xw.field("DEBUG",true);
    for (Map.Entry<LspBaseConfigAttribute,String> ent : config_attrs.entrySet()) {
       xw.begin("ATTRIBUTE");

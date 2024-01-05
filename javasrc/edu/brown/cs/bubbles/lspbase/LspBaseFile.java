@@ -40,9 +40,6 @@ import javax.swing.text.GapContent;
 import javax.swing.text.Position;
 import javax.swing.text.Segment;
 
-import org.commonmark.node.Node;
-import org.commonmark.parser.Parser;
-import org.commonmark.renderer.html.HtmlRenderer;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.w3c.dom.Element;
@@ -613,11 +610,11 @@ void edit(String bid,int id,List<LspBaseEdit> edits) throws LspBaseException
 	    String text = edit.getText();
 	    String txt = (text == null ? "" : text);
 	    LspLog.logD("EDIT BUFFER " + off + " " + len + " " + IvyFormat.formatString(txt));
-	
+
 	    JSONObject rng = proto.createRange(this,off,off+len);
 	    JSONObject rchng = createJson("range",rng,"text",txt);
 	    changes.put(rchng);
-	
+
 	    if (len > 0) {
 	       file_contents.remove(off,len);
 	     }
@@ -628,12 +625,12 @@ void edit(String bid,int id,List<LspBaseEdit> edits) throws LspBaseException
 	    if (file_elider != null) {
 	       file_elider.noteEdit(off,len,tlen);
 	     }
-	
+
 	    for (String user : base_ids) {
 	       if (user.equals(bid)) continue;
 	       sendEditToBubbles(user,off,len,txt);
 	     }
-	
+
 	    line_offsets.update(off,off+len,text);
 	  }
        }
@@ -988,12 +985,8 @@ private class HoverResponse implements LspJsonResponder {
 	 LspLog.logE("Unknown hover result " + rslt);
        }
       if (markdown != null) {
-	 Parser p = Parser.builder().build();
-	 Node document = p.parse(markdown);
-	 HtmlRenderer renderer = HtmlRenderer.builder().build();
-	 String text = renderer.render(document);
-	 if (text != null && text.startsWith("<p>")) text = text.substring(3);
-	 hover_text = text;
+	 String md = IvyFile.parseMarkdown(markdown);
+	 hover_text = md;
        }
     }
 
@@ -1496,26 +1489,34 @@ private class CodeActions implements LspArrayResponder {
    @Override public void handleResponse(JSONArray cacts) {
       int len = cacts.length();
       for (int i = 0; i < len; ++i) {
-	 JSONObject cact = cacts.getJSONObject(i);
-	 String kind = cact.optString("kind",null);
-	 if (kind == null) continue;
-	 if (kind.equals("quickfix.create.method")) continue;
-	 if (cact.optJSONObject("disabled") != null) continue;
-	 if (cact.optJSONObject("command") != null) continue;
-	 JSONObject edit = cact.optJSONObject("edit");
-	 if (!isValidEdit(edit)) continue;
-	
-	 int rel = (len - i)*10;
-	 if (cact.optBoolean("isPreferred")) rel += len*10;
-	
-	 xml_writer.begin("FIX");
-	 xml_writer.field("RELEVANCE",rel);
-	 xml_writer.field("DISPLAY",cact.getString("title"));
-	 xml_writer.field("ID",cact.hashCode());
-	 JSONArray edits = edit.getJSONArray("documentChanges");
-	 JSONArray editl = edits.getJSONObject(0).getJSONArray("edits");
-	 LspBaseUtil.outputTextEdit(LspBaseFile.this,editl,xml_writer);
-	 xml_writer.end("FIX");
+         JSONObject cact = cacts.getJSONObject(i);
+         String kind = cact.optString("kind",null);
+         if (kind == null) continue;
+         if (kind.equals("quickfix.create.method")) continue;
+         if (cact.optJSONObject("disabled") != null) continue;
+         JSONObject cmdact = cact.optJSONObject("command");
+         if (cmdact != null) {
+            String cmdname = cmdact.getString("command");
+            if (cmdname.contains("log")) cmdact = null;
+          }
+         if (cmdact != null) {
+            // would need to execute command after edit -- not implemented yet
+            continue;
+          }
+         JSONObject edit = cact.optJSONObject("edit");
+         if (!isValidEdit(edit)) continue;
+   
+         int rel = (len - i)*10;
+         if (cact.optBoolean("isPreferred")) rel += len*10;
+   
+         xml_writer.begin("FIX");
+         xml_writer.field("RELEVANCE",rel);
+         xml_writer.field("DISPLAY",cact.getString("title"));
+         xml_writer.field("ID",cact.hashCode());
+         JSONArray edits = edit.getJSONArray("documentChanges");
+         JSONArray editl = edits.getJSONObject(0).getJSONArray("edits");
+         LspBaseUtil.outputTextEdit(LspBaseFile.this,editl,xml_writer);
+         xml_writer.end("FIX");
        }
     }
 

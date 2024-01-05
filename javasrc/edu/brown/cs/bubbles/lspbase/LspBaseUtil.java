@@ -23,6 +23,9 @@
 package edu.brown.cs.bubbles.lspbase;
 
 import java.lang.reflect.Modifier;
+import java.util.Comparator;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -262,27 +265,57 @@ static void outputTextEdit(LspBaseFile file,JSONArray editl,IvyXmlWriter xw)
    if (editl.length() > 1) {
       int minoff = -1;
       int maxoff = -1;
+      Set<JSONObject> edits = new TreeSet<>(new EditComparator(file));
       for (int i = 0; i < editl.length(); ++i) {
          JSONObject ted = editl.getJSONObject(i);
+         ted.put("index",i);
          JSONObject rng = ted.getJSONObject("range");
+         edits.add(ted);
          int soff = file.mapRangeToStartOffset(rng);
          int eoff = file.mapRangeToEndOffset(rng);
          if (minoff < 0 || soff < minoff) minoff = soff;
          if (maxoff < 0 || eoff > maxoff) maxoff = eoff;
        }
       xw.begin("EDIT");
+      xw.field("TYPE","COMPOSITE");
       xw.field("OFFSET",minoff);
       xw.field("LENGTH",maxoff-minoff);
       xw.field("ID",editl.hashCode());
       xw.field("COUNTER",++edit_counter);
-      for (int i = 0; i < editl.length(); ++i) {
-         JSONObject ted = editl.getJSONObject(i);
+      for (JSONObject ted : edits) {
          outputSingleEdit(file,ted,xw);
        }
+      xw.end("EDIT");
     }
    else {
       JSONObject ted = editl.getJSONObject(0);
       outputSingleEdit(file,ted,xw);
+    }
+}
+
+
+
+private static class EditComparator implements Comparator<JSONObject> {
+   
+   private LspBaseFile for_file;
+   
+   EditComparator(LspBaseFile f) {
+      for_file = f;
+    }
+   
+   @Override public int compare(JSONObject ed0,JSONObject ed1) {
+      JSONObject rng0 = ed0.getJSONObject("range");
+      JSONObject rng1 = ed1.getJSONObject("range");
+      int soff0 = for_file.mapRangeToStartOffset(rng0);
+      int eoff0 = for_file.mapRangeToEndOffset(rng0);
+      int soff1 = for_file.mapRangeToStartOffset(rng1);
+      int eoff1 = for_file.mapRangeToEndOffset(rng1);
+      if (soff0 < soff1) return 1;
+      else if (soff0 > soff1) return -1;
+      else if (eoff0 < eoff1) return 1;
+      else if (eoff0 > eoff1) return -1;
+      
+      return 0;
     }
 }
 

@@ -684,11 +684,15 @@ void clearLineBreakpoints(String proj,String file,int line)
 
 private void loadBreakpoints()
 {
-   Element xml = IvyXml.loadXmlFromFile(break_file);
+   Element xml = null;
+   if (break_file.length() > 10) {
+      xml = IvyXml.loadXmlFromFile(break_file);
+    }
    if (xml == null) {
       exception_breakpoint = LspBaseBreakpoint.createExceptionBreakpoint(null,null,
 	    false,true);
       break_map.put(exception_breakpoint.getId(),exception_breakpoint);
+      saveBreakpoints();
     }
    else {
       for (Element be : IvyXml.children(xml,"BREAKPOINT")) {
