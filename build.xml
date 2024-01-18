@@ -1,0 +1,34 @@
+<project name='lspbase' default='all'>
+
+   <target name='all'>
+      <ant antfile="build.xml" dir="src" />
+   </target>
+
+</project>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
