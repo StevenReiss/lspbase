@@ -239,10 +239,11 @@ void open() throws LspBaseException
    for (LspBasePathSpec ps : project_paths) {
       if (ps.isUser()) {
 	 File dir = ps.getFile();
-	 File dir1 = getUserSourceDirectory(dir);
-	 if (dir1 != null) {
-	    findFiles(ps,null,dir1,false,0);
-	  }
+         findFiles(ps,null,dir,false,0);
+// 	 File dir1 = getUserSourceDirectory(dir);
+// 	 if (dir1 != null) {
+// 	    findFiles(ps,null,dir1,false,0);
+// 	  }
        }
     }
 
@@ -271,7 +272,8 @@ private File getUserSourceDirectory(File dir)
 
 protected void findFiles(LspBasePathSpec spec,String pfx,File f,boolean reload,int lvl)
 {
-   boolean nest = spec.isNested() || f.equals(spec.getFile());
+   if (f == null) return;
+   boolean nest = spec.isNested() || f.equals(spec.getFile()) || lvl == 0;
    if (!spec.useFile(f)) return;
 
    FileFilter filter = lsp_base.getLanguageData(project_language).getSourceFilter();
@@ -541,6 +543,8 @@ private void executeLibraryCommand(String typ,String cmd,LspBasePathSpec ps)
 
 void getAllNames(LspNamer namer)
 {
+   use_protocol.waitForProgressDone(null);
+   
    for (LspBaseFile lbf : project_files) {
       NameHandler nh = new NameHandler(namer,this,lbf);
       nh.handleResponse(lbf.getSymbols());
@@ -661,6 +665,7 @@ void build(boolean refresh,boolean reload)
    for (LspBasePathSpec ps : project_paths) {
       if (ps.isUser()) {
 	 File dir = ps.getFile();
+//       File dir1 = getUserSourceDirectory(dir);
 	 findFiles(ps,null,dir,reload,0);
        }
     }
@@ -876,6 +881,45 @@ private static class FindResponder implements LspAnyResponder {
 
 
 
+void textPreSearch(TextSearchData data,IvyXmlWriter xw)
+{
+   data.addFileCount(project_files.size());
+}
+
+
+void textSearch(TextSearchData data,IvyXmlWriter xw)
+{
+   textProgress(data,false);
+   
+   for (LspBaseFile f : project_files) {
+      if (data.getResultCount() > 0) {
+         f.textSearch(data,xw);
+       }
+      data.finishFile();
+      textProgress(data,false);
+    } 
+   
+   textProgress(data,true);
+}
+
+
+
+private void textProgress(TextSearchData data,boolean done) 
+{
+   LspBaseMain lspbase = LspBaseMain.getLspMain();
+   IvyXmlWriter xw = lspbase.beginMessage("PROGRESS");
+   double pct = data.getPercentDone() * 100;;
+   String kind = "WORKED";
+   if (pct == 0) kind = "BEGIN";
+   if (done) kind = "END";
+   
+   xw.field("KIND",kind);
+   xw.field("TASK","Doing text search");
+   xw.field("ID",data.hashCode());
+   xw.field("WORK",pct);
+   xw.field("S",data.getNextSerialNumber());
+   lspbase.finishMessage(xw);
+}
 
 /********************************************************************************/
 /*                                                                              */

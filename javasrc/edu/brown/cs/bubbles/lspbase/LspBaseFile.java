@@ -34,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
 
 import javax.swing.text.BadLocationException;
 import javax.swing.text.GapContent;
@@ -61,7 +62,6 @@ class LspBaseFile implements LspBaseConstants
 
 private File for_file;
 private LspBaseProject for_project;
-// private StringBuffer file_contents;
 private String file_language;
 private volatile int file_version;
 private LspBaseLineOffsets line_offsets;
@@ -423,27 +423,27 @@ private synchronized void setupOffsets()
 /*										*/
 /********************************************************************************/
 
-JSONArray getSymbols()
+synchronized JSONArray getSymbols()
 {
    if (file_symbols == null) {
       file_symbols = new JSONArray();
       LspBaseProtocol proto = for_project.getProtocol();
       try {
-	 proto.sendWorkMessage("textDocument/documentSymbol",
-	       this::handleSymbols,
-	       "textDocument",getTextDocumentId());
+         proto.sendWorkMessage("textDocument/documentSymbol",
+               this::handleSymbols,
+               "textDocument",getTextDocumentId());
        }
       catch (LspBaseException e) {
-	 LspLog.logE("Problem getting document symbols",e);
+         LspLog.logE("Problem getting document symbols",e);
        }
       if (for_project.getLanguageData().getCapabilityBool("lsp.fileModule")) {
-	 String nm = for_file.getName();
-	 int idx = nm.lastIndexOf(".");
-	 if (idx > 0) nm = nm.substring(0,idx);
-	 JSONObject rng = proto.createRange(this,0,getLength());
-	 JSONObject obj = createJson("name","","kind",2,"range",rng,
-	       "selectionRange",rng);
-	 addSymbolForFile(obj,null);
+         String nm = for_file.getName();
+         int idx = nm.lastIndexOf(".");
+         if (idx > 0) nm = nm.substring(0,idx);
+         JSONObject rng = proto.createRange(this,0,getLength());
+         JSONObject obj = createJson("name","","kind",2,"range",rng,
+               "selectionRange",rng);
+         addSymbolForFile(obj,null);
        }
     }
    return file_symbols;
@@ -500,7 +500,7 @@ private void addSymbolForFile(JSONObject sym,String pfx)
 }
 
 
-void clearSymbols()
+synchronized void clearSymbols()
 {
    file_symbols = null;
 }
@@ -1216,6 +1216,74 @@ private class TokenHolder implements LspJsonResponder {
        }
     }
 }
+
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Handle text search                                                      */
+/*                                                                              */
+/********************************************************************************/
+
+void textSearch(TextSearchData td,IvyXmlWriter xw)
+{
+   CharSequence text =  null;
+   if (file_contents == null) {
+      try {
+         text = IvyFile.loadFile(for_file);
+       }
+      catch (IOException e) {
+         return;
+       }
+    }
+   else {
+      text = getSegment(0,file_contents.length());
+    }
+   
+   Matcher m = td.getPattern().matcher(text);
+   while (m.find()) {
+      xw.begin("MATCH");
+      xw.field("STARTOFFSET",m.start());
+      xw.field("LENGTH",m.end() - m.start());
+      xw.field("FILE",for_file.getPath());
+      JSONArray syms = getSymbols();
+      JSONObject best = null;
+      int bestsz = 0;
+      for (int i = 0; i < syms.length(); ++i) {
+         JSONObject sym = syms.getJSONObject(i);
+         JSONObject range = sym.getJSONObject("range");
+         int kind = sym.getInt("kind");
+         switch (kind) {
+            case 1 :
+            case 2 :
+            case 5 :
+            case 6 :
+            case 9 :
+            case 10 :
+            case 11 :
+            case 12 :
+            case 23 :
+               break;
+            default :
+               continue;
+          }
+         int soff = mapRangeToLineStartOffset(range);
+         int eoff = mapRangeToEndOffset(range);
+         if (m.start() >= soff && m.end() <= eoff) {
+            if (best == null || eoff-soff < bestsz) {
+               best = sym;
+               bestsz = eoff-soff;
+             }
+          }
+       }
+      if (best != null) {
+         LspBaseUtil.outputLspSymbol(for_project,this,best,null,xw);
+       }
+      xw.end("MATCH");
+      if (!td.noteResult()) break;
+    }
+}
+
 
 
 /********************************************************************************/

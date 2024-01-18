@@ -38,6 +38,7 @@ package edu.brown.cs.bubbles.lspbase;
 import java.io.File;
 import java.net.URI;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -147,6 +148,48 @@ interface FindResult {
    JSONObject getDefinition();
    LspBaseFile getFile();
 }
+
+int	MAX_TEXT_SEARCH_RESULTS = 128;
+
+class TextSearchData {
+   
+   private Pattern search_pattern;
+   private int max_result;
+   private int total_files;
+   private int files_done;
+   private int serial_number;
+   
+   TextSearchData(Pattern p,int max) {
+      search_pattern = p;
+      max_result = max;
+      total_files = 0;
+      files_done = 0;
+      serial_number = 0;
+    }
+   
+   Pattern getPattern()                         { return search_pattern; }
+   
+   void addFileCount(int ct)                    { total_files += ct; }
+   
+   int getResultCount()                         { return max_result; }
+   boolean noteResult() {
+      --max_result;
+      return max_result > 0;
+    }
+   double finishFile() {
+      ++files_done;
+      return getPercentDone();
+    }
+   double getPercentDone() {
+      return ((double) files_done) / ((double) total_files);
+    }
+   
+   synchronized int getNextSerialNumber() {
+      return ++serial_number;
+    }
+   
+}       // end of inner class TextSearchData 
+   
 
 
 
@@ -298,11 +341,6 @@ public default JSONArray createJsonArray(Object ... elts)
     }
    return jarr;
 }
-
-
-
-
-
 
 
 

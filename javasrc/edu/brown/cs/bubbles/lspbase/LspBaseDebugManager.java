@@ -280,22 +280,23 @@ LspBaseDebugProtocol getDebugProtocol(LspBaseDebugTarget tgt)
 private void handleLaunchQuery(String proj,String query,boolean option,IvyXmlWriter xw)
    throws LspBaseException
 {
+   LspBaseProject lspproj = lsp_base.getProjectManager().findProject(proj);
+   
    switch (query) {
       case "START" :
-	 getStartFiles(proj,option,xw);
+	 getStartFiles(lspproj,option,xw);
 	 break;
       case "DEVICE" :
-	 getDevices(xw);
+	 getDevices(lspproj,xw);
 	 break;
     }
 }
 
 
 
-private void getStartFiles(String proj,boolean lib,IvyXmlWriter xw)
+private void getStartFiles(LspBaseProject lspproj,boolean lib,IvyXmlWriter xw)
    throws LspBaseException
 {
-   LspBaseProject lspproj = lsp_base.getProjectManager().findProject(proj);
    LspBaseProtocol proto = lspproj.getProtocol();
    MainFinder mf = new MainFinder(lspproj,lib,xw);
    proto.sendWorkMessage("workspace/symbol",mf,"query","main");
@@ -316,31 +317,34 @@ private class MainFinder implements LspArrayResponder {
 
    @Override public void handleResponse(JSONArray arr) {
       for (int i = 0; i < arr.length(); ++i) {
-	 JSONObject sym = arr.getJSONObject(i);
-	 if (!sym.getString("name").equals("main")) continue;
-	 if (sym.getInt("symbolKind") != 12) continue;
-	 String uri = sym.getJSONObject("location").getString("uri");
-	 File f = null;
-	 if (!use_library) {
-	    LspBaseFile lbf = for_project.findFile(uri);
-	    if (lbf == null) continue;
-	    f = lbf.getFile();
-	  }
-	 else {
-	    if (uri.startsWith("file:/")) {
-	       int j = 0;
-	       for (int k = 5; i < uri.length(); ++k) {
-		  if (uri.charAt(k) == '/') j = k;
-		  else break;
-		}
-	       uri = uri.substring(j);
-	     }
-	    f = new File(uri);
-	    if (!f.exists()) continue;
-	  }
-	 xml_writer.begin("OPTION");
-	 xml_writer.field("VALUE",f.getPath());
-	 xml_writer.end("OPTION");
+         JSONObject sym = arr.getJSONObject(i);
+         String nm = sym.getString("name");
+         int idx = nm.indexOf("(");
+         if (idx > 0) nm = nm.substring(0,idx);
+         if (!nm.equals("main")) continue;
+         if (sym.getInt("kind") != 12) continue;
+         String uri = sym.getJSONObject("location").getString("uri");
+         File f = null;
+         if (!use_library) {
+            LspBaseFile lbf = for_project.findFile(uri);
+            if (lbf == null) continue;
+            f = lbf.getFile();
+          }
+         else {
+            if (uri.startsWith("file:/")) {
+               int j = 0;
+               for (int k = 5; i < uri.length(); ++k) {
+        	  if (uri.charAt(k) == '/') j = k;
+        	  else break;
+        	}
+               uri = uri.substring(j);
+             }
+            f = new File(uri);
+            if (!f.exists()) continue;
+          }
+         xml_writer.begin("OPTION");
+         xml_writer.field("VALUE",f.getPath());
+         xml_writer.end("OPTION");
        }
     }
 
@@ -348,7 +352,7 @@ private class MainFinder implements LspArrayResponder {
 
 
 
-private void getDevices(IvyXmlWriter xw)
+private void getDevices(LspBaseProject proj,IvyXmlWriter xw)
    throws LspBaseException
 {
    try {

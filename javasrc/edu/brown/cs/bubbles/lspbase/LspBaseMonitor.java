@@ -229,6 +229,7 @@ private String handleCommand(String cmd,String proj,Element xml) throws LspBaseE
       case "FINDPACKAGE" :
       case "CREATECLASS" :
       case "PATTERNSEARCH" :
+      case "SEARCH" :
       case "FINDBYKEY" :
       case "FINDDEFINITIONS" :
       case "FINDREFERENCES" :

@@ -31,6 +31,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -240,6 +242,12 @@ void handleCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
 	       IvyXml.getAttrBool(xml,"DEFS",true),
 	       IvyXml.getAttrBool(xml,"REFS",true),
 	       IvyXml.getAttrBool(xml,"SYSTEM",false),xw);
+	 break;
+      case "SEARCH" :
+	 handleTextSearch(proj,IvyXml.getAttrInt(xml,"FLAGS",0),
+	       IvyXml.getTextElement(xml,"PATTERN"),
+	       IvyXml.getAttrInt(xml,"MAX",MAX_TEXT_SEARCH_RESULTS),
+	       xw);
 	 break;
       case "FINDDEFINITIONS" :
          handleFindAll(proj,IvyXml.getAttrString(xml,"FILE"),
@@ -963,6 +971,31 @@ void handlePatternSearch(String proj,String pat,String sf,
    throws LspBaseException
 {
    forAllProjects(proj,(LspBaseProject np) ->  np.safePatternSearch(pat,sf,defs,refs,sys,xw));
+}
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Text search                                                             */
+/*                                                                              */
+/********************************************************************************/
+
+void handleTextSearch(String proj,int regexpflags,String pat,int max,IvyXmlWriter xw) 
+   throws LspBaseException
+{
+   Pattern pp = null;
+   try {
+      pp = Pattern.compile(pat,regexpflags);
+    }
+   catch (PatternSyntaxException e) {
+      pp = Pattern.compile(pat,regexpflags|Pattern.LITERAL);
+    }
+   
+   TextSearchData data = new TextSearchData(pp,max);
+   
+   forAllProjects(proj,(LspBaseProject np) -> np.textPreSearch(data,xw));
+   
+   forAllProjects(proj,(LspBaseProject np) -> np.textSearch(data,xw));
 }
 
 
