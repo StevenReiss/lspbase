@@ -383,6 +383,7 @@
      "useParameters" : false,
      "fileModule" : true,
      "splitIndent" : false,
+     "lineIndent" : "none",
      "privatePrefix" : "_",
      "elision" : {
 	"scanBraces" : true,

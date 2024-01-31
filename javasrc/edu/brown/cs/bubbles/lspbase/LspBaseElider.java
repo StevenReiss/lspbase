@@ -75,6 +75,8 @@ private boolean pound_comments;
 private boolean text_blocks;            // using triple quotes
 private boolean backquote_blocks;
 private Segment file_contents;
+private boolean doing_elision;
+private volatile boolean abort_elision;
 
 
 
@@ -127,6 +129,9 @@ LspBaseElider(LspBaseFile file)
    pound_comments = lld.getCapabilityBool("lsp.elision.poundComments");
    text_blocks = lld.getCapabilityBool("lsp.elision.textBlocks");
    backquote_blocks = lld.getCapabilityBool("lsp.elision.backquoteBlocks");
+   
+   doing_elision = false;
+   abort_elision = false;
 }
 
 
@@ -169,43 +174,75 @@ void noteEdit(int soff,int len,int rlen)
 
 boolean computeElision(IvyXmlWriter xw) throws LspBaseException
 { 
-   LspLog.logD("ELISION START " + scan_braces + " " + scan_calls);
-   ElideData data = new ElideData();
+   synchronized (this) {
+      if (doing_elision) {
+         LspLog.logD("ELISION ABORT " + for_file.getFile());
+         while (doing_elision) {
+            abort_elision = true;
+            try {
+               wait(1000);
+             }
+            catch (InterruptedException e) { }
+          }
+       }
+      doing_elision = true;
+      abort_elision = false;
+    }
    
-   LspBaseProject lbp = for_file.getProject();
-   LspBaseProtocol proto = lbp.getProtocol();
-   LspLog.logD("ELISION FOLDS");
-   FoldResponder fr = new FoldResponder(data);
-   proto.sendWorkMessage("textDocument/foldingRange",fr,
-         "textDocument",for_file.getTextDocumentId());
-   
-   LspLog.logD("ELISION DECLS");
-   handleDecls(data,for_file.getSymbols(),null);
+   try {
+      LspLog.logD("ELISION START " + scan_braces + " " + scan_calls + " " + for_file.getFile());
+      ElideData data = new ElideData();
+      
+      LspBaseProject lbp = for_file.getProject();
+      LspBaseProtocol proto = lbp.getProtocol();
+      if (abort_elision) return false;
+      LspLog.logD("ELISION FOLDS");
+      FoldResponder fr = new FoldResponder(data);
+      proto.sendWorkMessage("textDocument/foldingRange",fr,
+            "textDocument",for_file.getTextDocumentId());
+      
+      if (abort_elision) return false;
+      LspLog.logD("ELISION DECLS");
+      handleDecls(data,for_file.getSymbols(),null);
 // proto.sendMessage("textDocument/documentSymbol",
 //       (Object resp,JSONObject err) -> handleDecls(data,resp,err),
 //       "textDocument",for_file.getTextDocumentId());
-   
-   List<ElideRange> ranges = data.getRanges();
-   Segment textdata = null;
-   for (ElideRange range : ranges) {
-      if (scan_calls || scan_braces) {
-         textdata = for_file.getSegment(range.getStartOffset(),
-               range.getEndOffset()-range.getStartOffset());
-       }
-      LspLog.logD("ELISION TOKENS");
-      TokenResponder tr = new TokenResponder(data,range,textdata);
-      proto.sendWorkMessage("textDocument/semanticTokens/range",tr,
-            "textDocument",for_file.getTextDocumentId(),
-            "range",proto.createRange(for_file,range.getStartOffset(),
-                  range.getEndOffset()));
       
-      if (scan_braces) {
-         LspLog.logD("ELISION BRACES");
-         scanBraces(data,range.getStartOffset(),range.getEndOffset(),textdata);
+      List<ElideRange> ranges = data.getRanges();
+      Segment textdata = null;
+      for (ElideRange range : ranges) {
+         if (abort_elision) return false;
+         if (scan_calls || scan_braces) {
+            int start = range.getStartOffset();
+            int end = range.getEndOffset();
+            if (end > for_file.getLength()) end = for_file.getLength(); 
+            textdata = for_file.getSegment(start,end-start);
+          }
+         LspLog.logD("ELISION TOKENS");
+         TokenResponder tr = new TokenResponder(data,range,textdata);
+         proto.sendWorkMessage("textDocument/semanticTokens/range",tr,
+               "textDocument",for_file.getTextDocumentId(),
+               "range",proto.createRange(for_file,range.getStartOffset(),
+                     range.getEndOffset()));
+         
+         if (abort_elision) return false;
+         if (scan_braces) {
+            LspLog.logD("ELISION BRACES");
+            scanBraces(data,range.getStartOffset(),range.getEndOffset(),textdata);
+          }
+       }
+      
+      if (abort_elision) return false;
+      data.outputElision(xw);
+      
+      LspLog.logD("ELISION END");
+    }
+   finally {
+      synchronized (this) {
+         doing_elision = false;
+         abort_elision = false;
        }
     }
-   
-   data.outputElision(xw);
    
    return true;
 }
@@ -258,6 +295,7 @@ private class TokenResponder implements LspJsonResponder {
 void handleFolds(ElideData data,JSONArray folds)
 { 
    for (int i = 0; i < folds.length(); ++i) {
+      if (abort_elision) return;
       JSONObject fold = folds.getJSONObject(i);
       int soff = for_file.mapLspLineToOffset(fold.getInt("startLine"));
       int eoff = for_file.mapLspLineCharToOffset(fold.getInt("endLine"),
@@ -289,18 +327,28 @@ void handleFolds(ElideData data,JSONArray folds)
 
 private int fixFoldEndOffset(JSONObject fold,int soff,int eoff)
 {
-   int scol = fold.optInt("startCharacter",0)+1;
-   char prevch = file_contents.charAt(soff+scol-1);
-   if (prevch == '\n' && scol > 0) {
-      char prevech = file_contents.charAt(eoff-1);
-      if (prevech == '\n') {
-         for (int i = eoff; i < file_contents.length(); ++i) {
-            char ch = file_contents.charAt(i);
-            if (ch == '\n') {
-               return i+1;
+   try {
+      int scol = fold.optInt("startCharacter",0)+1;
+      if (soff + scol -1 >= file_contents.length()) return eoff;
+      
+      char prevch = file_contents.charAt(soff+scol-1);
+      if (eoff > file_contents.length()) eoff = file_contents.length();
+      if (prevch == '\n' && scol > 0) {
+         char prevech = file_contents.charAt(eoff-1);
+         if (prevech == '\n') {
+            for (int i = eoff; i < file_contents.length(); ++i) {
+               char ch = file_contents.charAt(i);
+               if (ch == '\n') {
+                  return i+1;
+                }
              }
           }
        }
+    }
+   catch (Throwable t) {
+      LspLog.logE("Problem fixing fold end offset " +
+            soff + " " + eoff + " " + file_contents.length() +
+            fold.optInt("startCharacter",0),t);
     }
    return eoff;
 }
@@ -319,6 +367,7 @@ void handleDecls(ElideData data,Object resp,JSONObject err)
    
    JSONArray decls = (JSONArray) resp;
    for (int i = 0; i < decls.length(); ++i) {
+      if (abort_elision) return;
       JSONObject decl = decls.getJSONObject(i);
       handleDecl(data,decl);
       JSONArray children = decl.optJSONArray("children");
@@ -358,6 +407,7 @@ void handleTokens(ElideData edata,ElideRange range,Segment textdata,JSONArray ar
    int line = 0;
    int col = 0;
    for (int i = 0; i < arr.length(); i += 5) {
+      if (abort_elision) return;
       int dline = arr.getInt(i+0);
       line += dline;
       if (dline > 0) col = 0;
@@ -394,7 +444,9 @@ void handleTokens(ElideData edata,ElideRange range,Segment textdata,JSONArray ar
       en.setSymbolType(st);  
       if (st.contains("DECL")) {
          ElideNode par = en.getParent();
-         en.setSymbolName(par.getSymbolName());
+         if (par != null) {
+            en.setSymbolName(par.getSymbolName());
+          }
        }
     }
 }

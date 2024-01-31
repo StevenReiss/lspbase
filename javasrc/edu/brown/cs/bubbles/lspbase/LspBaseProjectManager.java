@@ -356,7 +356,7 @@ void handleEditCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
 	       IvyXml.getAttrBool(xml,"REFRESH"),
 	       IvyXml.getAttrBool(xml,"SAVE"),
                IvyXml.getAttrBool(xml,"COMPILE"),
-	       LspBaseMonitor.getElements(xml,"FILES"),xw);
+	       LspBaseMonitor.getElements(xml,"FILE"),xw);
 	 break;
       case "EDITFILE" :
          handleEditFile(proj,IvyXml.getAttrString(xml,"BID","*"),

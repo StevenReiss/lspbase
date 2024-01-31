@@ -444,7 +444,7 @@ void processResponse(JSONObject resp)
        }
     }
    catch (Throwable t) {
-      LspLog.logE("DEBUG: Problem processing response",t);
+      LspLog.logE("DEBUG: Problem processing debug response",t);
     }
    finally {
       synchronized (this) {

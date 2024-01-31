@@ -176,7 +176,8 @@ Segment getSegment(int off0,int len,Segment seg)
       return seg;
     }
    catch (BadLocationException e) {
-      LspLog.logE("Bad segment get ",e);
+      LspLog.logE("Bad segment get " + off0 + " " + len + " " +
+            file_contents.length(),e);
     }
 
    return null;
@@ -425,7 +426,10 @@ private synchronized void setupOffsets()
 
 synchronized JSONArray getSymbols()
 {
+   
    if (file_symbols == null) {
+      LspLog.logD("GET SYMBOLS for " + getFile());
+      
       file_symbols = new JSONArray();
       LspBaseProtocol proto = for_project.getProtocol();
       try {
@@ -436,6 +440,9 @@ synchronized JSONArray getSymbols()
       catch (LspBaseException e) {
          LspLog.logE("Problem getting document symbols",e);
        }
+      
+      LspLog.logD("DONE GET SYMBOLS");
+      
       if (for_project.getLanguageData().getCapabilityBool("lsp.fileModule")) {
          String nm = for_file.getName();
          int idx = nm.lastIndexOf(".");
@@ -574,7 +581,7 @@ private void sendEditToBubbles(String bid,int off,int len,String txt)
       byte [] data = txt.getBytes();
       msg.bytesElement("CONTENTS",data);
     }
-   else if (txt != null) {
+   else if (txt != null && !txt.isEmpty()) {
       msg.cdata(txt);
     }
    lspmain.finishMessageWait(msg,500);
@@ -771,22 +778,25 @@ private class IndentChecker implements LspArrayResponder {
    @Override public void handleResponse(JSONArray jarr) {
       add_indent = 0;		// for the case with no edits
       for (int i = 0; i < jarr.length(); ++i) {
-	 JSONObject ed = jarr.getJSONObject(i);
-	 String txt = ed.optString("newText");
-	 if (txt.length() == 0) txt = null;
-	 JSONObject range = ed.getJSONObject("range");
-	 int lstart = mapRangeToStartOffset(range);
-	 int lend = mapRangeToEndOffset(range);
-
-	 if (txt != null && txt.length() >= 1 && txt.charAt(0) == '\n') {
-	    if (line_start > lstart && line_start <= lend && lend < line_end) {
-	       add_indent = txt.length() - (lend-lstart);
-	     }
-	  }
-	 else if (txt == null && lstart < line_start + cur_white &&
-	       lend <= line_start + cur_white) {
-	    add_indent = -(lend-lstart);
-	  }
+         JSONObject ed = jarr.getJSONObject(i);
+         String txt = ed.optString("newText");
+         if (txt.length() == 0) txt = null;
+         JSONObject range = ed.getJSONObject("range");
+         int lstart = mapRangeToStartOffset(range);
+         int lend = mapRangeToEndOffset(range);
+   
+         if (txt != null && txt.length() >= 1 && txt.charAt(0) == '\n') {
+            if (line_start > lstart && line_start <= lend && lend < line_end) {
+               add_indent = txt.length() - (lend-lstart);
+             }
+          }
+         else if (txt == null && lstart < line_start + cur_white &&
+               lend <= line_start + cur_white) {
+            add_indent = -(lend-lstart);
+          }
+         else if (txt != null) {
+            if (lstart == lend) add_indent = txt.length();
+          }
        }
     }
 }
@@ -914,6 +924,7 @@ private class FormatFixer implements LspArrayResponder {
    @Override public void handleResponse(JSONArray edits) {
       try {
 	 edit("*FORMAT",0,edits);
+         made_edits = true;
        }
       catch (LspBaseException e) {
 	 LspLog.logE("Problem with formatting edits",e);
@@ -1295,6 +1306,9 @@ void textSearch(TextSearchData td,IvyXmlWriter xw)
 boolean commit(boolean refresh,boolean save,boolean compile)
    throws Exception
 {
+   LspLog.logD("COMMIT FILE " + getFile() + " " + refresh + " " + save + " " + compile + 
+         " " + file_version);
+   
    if (compile) {
       LspBaseProtocol lbp = for_project.getProtocol();
       LspBaseLanguageData ld = getLanguageData();
@@ -1463,30 +1477,33 @@ private class CompletionItem implements Comparable<CompletionItem> {
       completion_kind = CompletionKinds[itm.optInt("kind")];
       JSONObject edit = itm.optJSONObject("textEdit");
       if (edit == null) return;
-
+   
       JSONObject repl = edit.optJSONObject("replace");
-      int rstart = mapRangeToStartOffset(repl);
-      int rend = mapRangeToEndOffset(repl);
       JSONObject insert = edit.optJSONObject("insert");
-      int istart = mapRangeToStartOffset(insert);
-      int iend = mapRangeToEndOffset(insert);
-      if (istart != iend || istart != rstart) {
-	 LspLog.logE("BAD INSERT/REPLACE EDIT " + itm.toString(2));
-	 return;
+      if (insert != null) {
+         start_offset = mapRangeToStartOffset(insert);
+         end_offset = mapRangeToEndOffset(insert);
        }
-      start_offset = rstart;
-      end_offset = rend;
-
+      else if (repl != null) {
+         start_offset = mapRangeToStartOffset(repl);
+         end_offset = mapRangeToEndOffset(repl);
+       }
+      else {
+         JSONObject range = edit.optJSONObject("range");
+         start_offset = mapRangeToStartOffset(range);
+         end_offset = mapRangeToEndOffset(range);
+       }
+   
       completion_text = edit.getString("newText");
       completion_name = itm.getString("label");
       completion_name = completion_name.replace("\u2026","...");
       signature_text = itm.optString("detail",null);
       if (signature_text != null) {
-	 signature_text = signature_text.replace("\u2192","->");
+         signature_text = signature_text.replace("\u2192","->");
        }
-      sort_on = itm.optString("sortText","");
+      sort_on = itm.optString("sortText",completion_name);
       sort_on += "_" + completion_name;
-
+   
     }
 
    boolean isUsable() {
@@ -1705,18 +1722,18 @@ private class Renamer implements LspJsonResponder {
       LspBaseMain lsp = LspBaseMain.getLspMain();
       LspBaseProjectManager lpm = lsp.getProjectManager();
       if (wsedit.isNull("documentChanges")) {
-	 xml_writer.begin("FAILURE");
-	 xml_writer.field("TYPE","NOCHANGE");
-	 xml_writer.end("FAILURE");
+         xml_writer.begin("FAILURE");
+         xml_writer.field("TYPE","NOCHANGE");
+         xml_writer.end("FAILURE");
        }
       else {
-	 try {
-	    lpm.applyWorkspaceEdit(wsedit);
-	  }
-	 catch (LspBaseException e) {
-	    LspLog.logE("Problem applying edits",e);
-	  }
-	 xml_writer.emptyElement("EDITS");
+         try {
+            lpm.applyWorkspaceEdit(wsedit);
+          }
+         catch (LspBaseException e) {
+            LspLog.logE("Problem applying edits",e);
+          }
+         xml_writer.emptyElement("EDITS");
        }
     }
 

@@ -36,6 +36,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -84,8 +85,8 @@ private static AtomicLong progress_counter = new AtomicLong(1);
 
 LspBaseProtocol(File workspace,List<LspBasePathSpec> paths,LspBaseLanguageData ld)
 {
-   pending_map = new HashMap<>();
-   error_map = new HashMap<>();
+   pending_map = new ConcurrentHashMap<>();
+   error_map = new ConcurrentHashMap<>();
    pathWorkspaceMap = new HashMap<>();
    workspacePathMap = new HashMap<>();
    active_progress = new HashSet<>();
@@ -202,7 +203,7 @@ void initialize() throws LspBaseException
       obj.put("rootUri",getUri(source_roots.get(0)));
     }
    obj.put("capabilities",clientcaps);
-   obj.put("trace","verbose");
+   obj.put("trace","messages");
    if (!for_language.isSingleWorkspace()) {
       List<JSONObject> ws = new ArrayList<>();
       for (File f : source_roots) {
@@ -433,11 +434,13 @@ private void localDoSendMessage(String method,LspResponder resp,boolean wait,JSO
 
    LspLog.logD("Send: " + id + " " + method + " " + jo.toString(2));
 
-   if (resp != null) {
-      pending_map.put(id,resp);
+   synchronized (this) {
+      if (resp != null) {
+         pending_map.put(id,resp);
+       }
+      if (!wait) error_map.put(id,"");
     }
-   if (!wait) error_map.put(id,"");
-
+   
    synchronized (message_stream) {
       try{
 	 message_stream.write(buf.toString());
@@ -541,7 +544,7 @@ void processReply(int id,Object cnts)
 
 void processError(int id,JSONObject err)
 {
-   LspLog.logE("Process Error " + err.toString(2));
+   LspLog.logE("Process Error " + id + " " + err.toString(2));
 
    LspResponder lsp = pending_map.get(id);
    String er = error_map.get(id);
@@ -582,6 +585,11 @@ void processNotification(Integer id,String method,Object params)
       s = jparams.toString(2);
     }
    LspLog.logD("Notification: " + method + " " + id + " "+ s);
+   synchronized (this) {
+      if (pending_map.remove(id) != null) {
+         notifyAll();
+       }
+    }
 
    Object result = null;
    switch (method) {
@@ -771,10 +779,12 @@ void handleLogMessage(int id,JSONObject params)
 private class MessageReader extends Thread {
 
    private BufferedInputStream message_input;
+   private byte [] byte_buf;
 
    MessageReader(InputStream input) {
       super("LSP_Message_Reader_ " + client_id);
       message_input = new BufferedInputStream(input);
+      byte_buf = null;
     }
 
    @Override public void run() {
@@ -782,7 +792,11 @@ private class MessageReader extends Thread {
       for ( ; ; ) {
 	 try {
 	    String ln = readline();
-	    if (ln == null) break;
+	    if (ln == null) {
+               ln = readline();
+               if (ln == null) break;
+             }
+            LspLog.logD("Header line: " + clen + " " + ln.length() + ln);
 	    if (ln.length() == 0) {
 	       if (clen > 0) {
 		  byte [] buf = new byte[clen];
@@ -793,7 +807,7 @@ private class MessageReader extends Thread {
 		   }
 		  String rslt = new String(buf,0,rln);
 		  JSONObject jobj = new JSONObject(rslt);
-//		  LspLog.logD("Received: " + clen + " " + rln + "::\n" + jobj.toString(2));
+		  LspLog.logD("Received: " + clen + " " + rln + "::\n" + jobj.toString(2));
 		  process(jobj);
 		  clen = -1;
 		}
@@ -811,20 +825,28 @@ private class MessageReader extends Thread {
 	  }
 	 catch (IOException e) { }
        }
+      LspLog.logE("END OF FILE RECEIVED FROM INPUT READER " + byte_buf);
    }
 
    String readline() throws IOException {
-      byte [] buf = new byte[10000];
+      byte_buf = new byte[10000];
       int ln = 0;
       int lastb = 0;
       for ( ; ; ) {
 	 int b = message_input.read();
 	 if (b == '\n' && lastb == '\r') break;
-	 buf[ln++] = (byte) b;
+         if (b == -1) {
+            LspLog.logD("EOF FROM input stream " + ln);
+            for (int j = 0; j < ln; ++j) {
+               char ch = (char) byte_buf[j];
+               LspLog.logD("   CHAR " + j + " " + ch);
+             }
+          }
+	 byte_buf[ln++] = (byte) b;
 	 lastb = b;
        }
-      if (ln > 0 && buf[ln-1] == '\r') --ln;
-      return new String(buf,0,ln);
+      if (ln > 0 && byte_buf[ln-1] == '\r') --ln;
+      return new String(byte_buf,0,ln);
     }
 
    void process(JSONObject reply) {
@@ -832,26 +854,26 @@ private class MessageReader extends Thread {
       String method = reply.optString("method",null);
       JSONObject err = reply.optJSONObject("error");
       if (err != null) {
-	 processError(id,err);
+         processError(id,err);
        }
       else if (id == 0 || pending_map.get(id) == null) {
-	 if (method != null) {
-	    Object params = reply.opt("params");
-	    processNotification(id,method,params);
-	  }
-	 else {
-	    String rslt = reply.optString("result",null);
-	    if (rslt != null) {
-	       LspLog.logE("Problem with message " + reply.toString(2));
-	     }
-	    else {
-	       LspLog.logD("Process unused message " + reply.toString(2));
-	     }
-	  }
+         if (method != null) {
+            Object params = reply.opt("params");
+            processNotification(id,method,params);
+          }
+         else {
+            String rslt = reply.optString("result",null);
+            if (rslt != null) {
+               LspLog.logE("Problem with message " + reply.toString(2));
+             }
+            else {
+               LspLog.logD("Process unused message " + reply.toString(2));
+             }
+          }
        }
       else {
-	 LspLog.logD("Handle reply: " + id + "\n" + reply.toString(2));
-	 processReply(id,reply.opt("result"));
+         LspLog.logD("Handle reply: " + id + "\n" + reply.toString(2));
+         processReply(id,reply.opt("result"));
        }
     }
 

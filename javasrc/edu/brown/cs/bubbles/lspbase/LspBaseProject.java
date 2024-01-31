@@ -818,7 +818,11 @@ void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolea
             "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn())); 
     }
    
+   
    List<FindResult> rslts = rslt.getResults();
+   
+   LspLog.logD("FIND yielded " + rslts.size() + " results");
+   
    if (rslts.isEmpty()) return;
    JSONObject def = null;
    for (FindResult symloc : rslts) {
@@ -859,6 +863,8 @@ void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolea
       // output result
       LspBaseUtil.outputFindResult(symloc,xw);
     }
+   
+   LspLog.logD("Finished findAll" + rslts.size());
 }
 
 
@@ -937,6 +943,9 @@ void fullyQualifiedName(LspBaseFile file,int start,int end,IvyXmlWriter xw)
          new FindResponder(rslt,"DEFS"),
          "textDocument",file.getTextDocumentId(),
          "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
+   
+   LspLog.logD("FULLY QUALIFIED NAME RESULTS " + rslt.getResults().size());
+   boolean fnd = false;
    for (FindResult fr : rslt.getResults()) {
       JSONObject def = fr.getDefinition();
       if (def != null) {
@@ -949,9 +958,11 @@ void fullyQualifiedName(LspBaseFile file,int start,int end,IvyXmlWriter xw)
          String det = def.optString("detail",null);
          if (det != null) xw.field("TYPE",det);
          xw.end("FULLYQUALIFIEDNAME");
+         fnd = true;
          break;
        }
     }
+   if (!fnd) LspLog.logD("No definition found for fully qualified name");
 }
 
 
@@ -1093,9 +1104,12 @@ void willSaveFile(LspBaseFile lbf) throws LspBaseException
 
 void didSaveFile(LspBaseFile lbf) throws LspBaseException
 { 
-   if (lbf.getLanguageData().getCapabilityBool("textDocumentSync.Save")) {
+   if (lbf.getLanguageData().getCapabilityBool("textDocumentSync.save")) {
       use_protocol.sendMessage("textDocument/didSave",
             "textDocument",lbf.getTextDocumentId());
+    }
+   else {
+      // close and open the document
     }
 }
 

@@ -124,7 +124,7 @@ int computeIndent()
 int computePartialIndent()
 {
    split_pos = for_file.mapOffsetToLineColumn(start_offset);
-   current_line = current_line+1;
+// current_line = current_line+1;
    return computeActualIndent();
 }
 

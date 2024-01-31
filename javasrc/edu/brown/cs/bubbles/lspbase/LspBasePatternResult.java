@@ -316,6 +316,9 @@ Pattern makeRegexFromWildcard(String wc)
    q1 = q1.replace(")","\\)");
    q1 = q1.replace("[","\\[");
    q1 = q1.replace("]","\\]");
+   q1 = q1.replace("{","\\{");
+   q1 = q1.replace("}","\\}");
+   
    
    q1 = q1.replace("*","(.*)");
    
