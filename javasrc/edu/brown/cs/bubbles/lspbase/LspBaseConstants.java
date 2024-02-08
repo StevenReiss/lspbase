@@ -110,7 +110,7 @@ interface LspNamer {
 /********************************************************************************/
 
 int LSPBASE_CORE_POOL_SIZE = 2;
-int LSPBASE_MAX_POOL_SIZE = 8;
+int LSPBASE_MAX_POOL_SIZE = 16;
 long LSPBASE_POOL_KEEP_ALIVE_TIME = 2*60*1000;
 
 

@@ -285,6 +285,17 @@ public List<String> getToolArguments()
 }
 
 
+public String getDevice()
+{
+   return config_attrs.get(LspBaseConfigAttribute.DEVICE);
+}
+
+
+public String getAttribute(LspBaseConfigAttribute id)
+{
+   return config_attrs.get(id);
+}
+
 
 /********************************************************************************/
 /*										*/

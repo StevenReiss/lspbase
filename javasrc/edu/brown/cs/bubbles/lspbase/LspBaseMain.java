@@ -30,7 +30,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -399,7 +400,21 @@ public String finishMessageWait(IvyXmlWriter xw,long delay)
 
 public void startTask(Runnable r)
 {
-   if (r != null) thread_pool.execute(r);
+   if (r != null) {
+      for ( ; ; ) {
+         try {
+            thread_pool.execute(r);
+            break;
+          }
+         catch (RejectedExecutionException e) { }
+         synchronized (this) {
+            try {
+               wait(1000);
+             }
+            catch (InterruptedException e) { }
+          }   
+       }
+    }
 }
 
 
@@ -432,7 +447,7 @@ private static class LspBaseThreadPool extends ThreadPoolExecutor implements Thr
    LspBaseThreadPool() {
       super(LSPBASE_CORE_POOL_SIZE,LSPBASE_MAX_POOL_SIZE,
             LSPBASE_POOL_KEEP_ALIVE_TIME,TimeUnit.MILLISECONDS,
-            new LinkedBlockingQueue<Runnable>());
+            new SynchronousQueue<Runnable>());
    
       setThreadFactory(this);
     }

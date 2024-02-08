@@ -917,7 +917,7 @@ private void textProgress(TextSearchData data,boolean done)
    double pct = data.getPercentDone() * 100;;
    String kind = "WORKED";
    if (pct == 0) kind = "BEGIN";
-   if (done) kind = "END";
+   if (done) kind = "DONE`";
    
    xw.field("KIND",kind);
    xw.field("TASK","Doing text search");
@@ -1111,6 +1111,10 @@ void didSaveFile(LspBaseFile lbf) throws LspBaseException
    else {
       // close and open the document
     }
+   
+   IvyXmlWriter xw = lsp_base.beginMessage("RESOURCE");
+   outputDelta(xw,"CHANGED",lbf);
+   lsp_base.finishMessage(xw);
 }
 
 

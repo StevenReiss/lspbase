@@ -616,13 +616,17 @@ void edit(String bid,int id,List<LspBaseEdit> edits) throws LspBaseException
 	    int tlen = 0;
 	    String text = edit.getText();
 	    String txt = (text == null ? "" : text);
-	    LspLog.logD("EDIT BUFFER " + off + " " + len + " " + IvyFormat.formatString(txt));
+	    LspLog.logD("EDIT BUFFER " + off + " " + len + " " + 
+                  IvyFormat.formatString(txt) + " " + edit);
 
 	    JSONObject rng = proto.createRange(this,off,off+len);
 	    JSONObject rchng = createJson("range",rng,"text",txt);
 	    changes.put(rchng);
 
 	    if (len > 0) {
+               if (off + len >= file_contents.length()) {
+                  len = file_contents.length() - off - 1;
+                }
 	       file_contents.remove(off,len);
 	     }
 	    if (text != null && text.length() > 0) {
@@ -641,7 +645,9 @@ void edit(String bid,int id,List<LspBaseEdit> edits) throws LspBaseException
 	    line_offsets.update(off,off+len,text);
 	  }
        }
-      catch (BadLocationException e) { }
+      catch (BadLocationException e) {
+         LspLog.logE("Problem editing " + e);
+       }
 
       chng = is_changed;
       is_changed = true;
@@ -1019,8 +1025,10 @@ void findRegions(String cls,boolean pfx,boolean stat,boolean compunit,
    JSONArray syms = getSymbols();
    if (cls != null) {
       top = findSymbol(syms,cls);
-      if (top == null) throw new LspBaseException("Class " + cls + " not found");
-      syms = top.optJSONArray("nested");
+      if (top == null && !compunit) throw new LspBaseException("Class " + cls + " not found");
+      if (top != null) {
+         syms = top.optJSONArray("nested");
+       }
     }
    else if (syms.length() == 1) {
       JSONObject sym = syms.getJSONObject(0);

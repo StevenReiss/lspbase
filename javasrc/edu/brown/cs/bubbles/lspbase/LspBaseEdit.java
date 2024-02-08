@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.json.JSONObject;
 import org.w3c.dom.Element;
 
+import edu.brown.cs.ivy.file.IvyFormat;
 import edu.brown.cs.ivy.xml.IvyXml;
 
 class LspBaseEdit implements LspBaseConstants, Comparable<LspBaseEdit>
@@ -98,6 +99,24 @@ String getText()                                { return edit_text; }
    return edit_index - ed.edit_index;
 }
 
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Output methods                                                          */
+/*                                                                              */
+/********************************************************************************/
+
+@Override public String toString()
+{
+   String r = "EDIT{" + start_offset + ":" + end_offset;
+   if (edit_text != null) {
+      r += "@" + IvyFormat.formatString(edit_text);
+    }
+   r += "}";
+   
+   return r;
+}
 
 
 }       // end of class LspBaseEdit

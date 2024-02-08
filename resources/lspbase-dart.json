@@ -327,8 +327,8 @@
 	"supportsStartDebuggingRequest" : true
       },
      "flutterLaunchData" : {
-	"debugExternalPackageLibraries" : false,
-	"debugSdkLibraries" : false,
+	"debugExternalPackageLibraries" : true,
+	"debugSdkLibraries" : true,
 	"evaluateGettersInDebugViews" : true,
 	"evaluateToStringInDebugViews" : false,
 	"sendLogsToClient" : false,
@@ -385,6 +385,7 @@
      "splitIndent" : false,
      "lineIndent" : "none",
      "privatePrefix" : "_",
+     "compileOnSave" : false,
      "elision" : {
 	"scanBraces" : true,
 	"scanCalls" : true,
@@ -424,11 +425,6 @@
 	      "name" : "VM_ARGUMENTS",
 	      "description" : "VM Arguments",
 	      "type" : "STRING"
-	    },
-	    {
-	      "name" : "DEBUG_LIBRARIES",
-	      "description" : "Debug in Libraries",
-	      "type" : "BOOLEAN"
 	    }
 	  ]
 	},
@@ -455,11 +451,6 @@
 	      "name" : "VM_ARGUMENTS",
 	      "description" : "VM Arguments",
 	      "type" : "STRING"
-	    },
-	    {
-	      "name" : "DEBUG_LIBRARIES",
-	      "description" : "Debug in Libraries",
-	      "type" : "BOOLEAN"
 	    }
 	  ]
 	}

@@ -206,7 +206,10 @@ private String handleCommand(String cmd,String proj,Element xml) throws LspBaseE
       case "EXIT" :
 	 if (--num_clients <= 0) {
 	    LspLog.logD("Stopping application");
-	    shutdown_mint = true;    
+            synchronized (this) {
+               shutdown_mint = true;    
+               notifyAll();
+             }
           }
          break;
       case "LOGLEVEL" :

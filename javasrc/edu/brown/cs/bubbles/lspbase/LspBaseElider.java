@@ -77,6 +77,7 @@ private boolean backquote_blocks;
 private Segment file_contents;
 private boolean doing_elision;
 private volatile boolean abort_elision;
+private boolean update_contents;
 
 
 
@@ -106,7 +107,8 @@ LspBaseElider(LspBaseFile file)
 {
    for_file = file;
    elide_rdata = new TreeSet<>();
-   file_contents = file.getSegment(0,file.getLength());
+   update_contents = true;
+   file_contents = null;
    
    Object prop = file.getProject().getLanguageData().getCapability(TOKEN_TYPES);
    JSONArray jarr = (JSONArray) prop;
@@ -162,6 +164,11 @@ void noteEdit(int soff,int len,int rlen)
       ElideRegion ed = it.next();
       if (!ed.noteEdit(soff,len,rlen)) it.remove();
     }
+   
+   synchronized (this) {
+      abort_elision = true;
+      update_contents = true;
+    }
 }
 
 
@@ -174,6 +181,7 @@ void noteEdit(int soff,int len,int rlen)
 
 boolean computeElision(IvyXmlWriter xw) throws LspBaseException
 { 
+  
    synchronized (this) {
       if (doing_elision) {
          LspLog.logD("ELISION ABORT " + for_file.getFile());
@@ -187,6 +195,9 @@ boolean computeElision(IvyXmlWriter xw) throws LspBaseException
        }
       doing_elision = true;
       abort_elision = false;
+      if (update_contents) {
+         file_contents = for_file.getSegment(0,for_file.getLength());
+       }
     }
    
    try {
@@ -386,12 +397,51 @@ private void handleDecl(ElideData data,JSONObject decl)
    String ntype = ElideDeclTypes[decl.getInt("kind")];
    if (ntype == null) return;
    
+   soff = fixDeclStartOffset(soff,ntype);
+   
    ElideNode en = data.addNode(soff,eoff,ntype,null);
    // TODO:  get File prefix and add it to name
    String name = decl.getString("name");
    String det = decl.optString("detail","");
    String fpfx = for_file.getProject().getRelativeFile(for_file);
    en.setSymbolName(fpfx + ";" + name + det);
+}
+
+
+
+private int fixDeclStartOffset(int soff,String ntype)
+{
+   switch (ntype) {
+      case "METHOD" :
+      case "CLASS" :
+      case "ANNOT" :
+      case "FIELD" :
+      case "ENUM" :
+      case "VARIABLE" :
+         break;
+      default :
+         return soff;
+    }
+   
+   // include prior annotations as part of declaration
+   int off = soff;
+   boolean lstart = true;
+   for ( ; off >= 0; off--) {
+      char c = file_contents.charAt(off);
+      if (Character.isWhitespace(c)) {
+         if (lstart && c == '\n') lstart = false;
+         else if (lstart) soff = off;
+       }
+      else if (Character.isJavaIdentifierPart(c)) ;
+      else if (c == '}' || c == ';' || 
+            c == '{' || c == ',') break;
+      else if (c == '@') {
+         soff = off;
+         lstart = true;
+       }
+    }
+   
+   return soff;
 }
 
 

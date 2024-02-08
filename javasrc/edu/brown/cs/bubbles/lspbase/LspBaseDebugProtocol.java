@@ -81,7 +81,7 @@ private Writer message_stream;
 private JSONObject config_data;
 private LspBaseDebugManager debug_manager;
 
-private static AtomicInteger id_counter = new AtomicInteger(50000);
+private static AtomicInteger id_counter = new AtomicInteger(500000);
 private static AtomicLong progress_counter = new AtomicLong(1);
 
 
@@ -561,39 +561,39 @@ private class MessageReader extends Thread {
    @Override public void run() {
       int clen = -1;
       for ( ; ; ) {
-	 try {
-	    String ln = readline();
-	    if (ln == null) break;
-	    LspLog.logD("DEBUG: Read line: " + ln);
-	    if (ln.length() == 0) {
-	       if (clen > 0) {
-		  byte [] buf = new byte[clen];
-		  int rln = 0;
-		  while (rln < clen) {
-		     int mln = message_input.read(buf,rln,clen-rln);
-		     rln += mln;
-		   }
-		  String rslt = new String(buf,0,rln);
-		  JSONObject jobj = new JSONObject(rslt);
-		  LspLog.logD("DEBUG: Received " + clen + " " + rln + "::\n" + jobj.toString(2));
-		  process(jobj);
-		  clen = -1;
-		}
-	     }
-	    else {
-	       int idx = ln.indexOf(":");
-	       if (idx >= 0) {
-		  String key = ln.substring(0,idx).trim();
-		  String val = ln.substring(idx+1).trim();
-		  if (key.equalsIgnoreCase("Content-Length")) {
-		     clen = Integer.parseInt(val);
-		   }
-		}
-	     }
-	  }
-	 catch (IOException e) {
-	    LspLog.logE("DEBUG: Problem reading debug message",e);
-	  }
+         try {
+            String ln = readline();
+            if (ln == null) break;
+            LspLog.logD("DEBUG: Read line: " + ln);
+            if (ln.length() == 0) {
+               if (clen > 0) {
+        	  byte [] buf = new byte[clen];
+        	  int rln = 0;
+        	  while (rln < clen) {
+        	     int mln = message_input.read(buf,rln,clen-rln);
+        	     rln += mln;
+        	   }
+        	  String rslt = new String(buf,0,rln);
+        	  JSONObject jobj = new JSONObject(rslt);
+        	  LspLog.logD("DEBUG: Received " + clen + " " + rln + "::\n" + jobj.toString(2));
+        	  process(jobj);
+        	  clen = -1;
+        	}
+             }
+            else {
+               int idx = ln.indexOf(":");
+               if (idx >= 0) {
+        	  String key = ln.substring(0,idx).trim();
+        	  String val = ln.substring(idx+1).trim();
+        	  if (key.equalsIgnoreCase("Content-Length")) {
+        	     clen = Integer.parseInt(val);
+        	   }
+        	}
+             }
+          }
+         catch (IOException e) {
+            LspLog.logE("DEBUG: Problem reading debug message",e);
+          }
        }
       LspLog.logI("DEBUG: message reader exited");
     }
@@ -618,13 +618,13 @@ private class MessageReader extends Thread {
       String type = reply.getString("type");
       // might want to not process events if we are processing a response actively?
       if (type.equals("event")) {
-	 // process events asynchronously as they might generate messages
-	 LspBaseMain lsp = LspBaseMain.getLspMain();
-	 lsp.startTask(mp);
+         // process events asynchronously as they might generate messages
+         LspBaseMain lsp = LspBaseMain.getLspMain();
+         lsp.startTask(mp);
        }
       else {
-	 // process responses and requests synchronously
-	 mp.run();
+         // process responses and requests synchronously
+         mp.run();
        }
     }
 
@@ -642,21 +642,21 @@ class MessageProcessor implements Runnable {
 
    @Override public void run() {
       LspLog.logD("Debug process " + json_message.toString(2));
-
+   
       String type = json_message.getString("type");
       switch (type) {
-	 case "response" :
-	    processResponse(json_message);
-	    break;
-	 case "event" :
-	    processEvent(json_message);
-	    break;
-	 case "request" :
-	    processRequest(json_message);
-	    break;
-	 default :
-	    LspLog.logE("DEBUG: Unexpected message of type " + type + " " + json_message.toString(2));
-	    break;
+         case "response" :
+            processResponse(json_message);
+            break;
+         case "event" :
+            processEvent(json_message);
+            break;
+         case "request" :
+            processRequest(json_message);
+            break;
+         default :
+            LspLog.logE("DEBUG: Unexpected message of type " + type + " " + json_message.toString(2));
+            break;
        }
     }
 

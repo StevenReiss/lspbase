@@ -73,7 +73,7 @@ private Set<String> active_progress;
 
 
 
-private static AtomicInteger id_counter = new AtomicInteger(10000);
+private static AtomicInteger id_counter = new AtomicInteger(100000);
 private static AtomicLong progress_counter = new AtomicLong(1);
 
 
@@ -782,7 +782,7 @@ private class MessageReader extends Thread {
    private byte [] byte_buf;
 
    MessageReader(InputStream input) {
-      super("LSP_Message_Reader_ " + client_id);
+      super("LSP_Message_Reader_" + client_id);
       message_input = new BufferedInputStream(input);
       byte_buf = null;
     }
@@ -796,7 +796,7 @@ private class MessageReader extends Thread {
                ln = readline();
                if (ln == null) break;
              }
-            LspLog.logD("Header line: " + clen + " " + ln.length() + ln);
+//          LspLog.logD("Header line: " + clen + " " + ln.length() + ln);
 	    if (ln.length() == 0) {
 	       if (clen > 0) {
 		  byte [] buf = new byte[clen];
@@ -807,7 +807,7 @@ private class MessageReader extends Thread {
 		   }
 		  String rslt = new String(buf,0,rln);
 		  JSONObject jobj = new JSONObject(rslt);
-		  LspLog.logD("Received: " + clen + " " + rln + "::\n" + jobj.toString(2));
+// 		  LspLog.logD("Received: " + clen + " " + rln + "::\n" + jobj.toString(2));
 		  process(jobj);
 		  clen = -1;
 		}
@@ -850,31 +850,10 @@ private class MessageReader extends Thread {
     }
 
    void process(JSONObject reply) {
-      int id = reply.optInt("id");
-      String method = reply.optString("method",null);
-      JSONObject err = reply.optJSONObject("error");
-      if (err != null) {
-         processError(id,err);
-       }
-      else if (id == 0 || pending_map.get(id) == null) {
-         if (method != null) {
-            Object params = reply.opt("params");
-            processNotification(id,method,params);
-          }
-         else {
-            String rslt = reply.optString("result",null);
-            if (rslt != null) {
-               LspLog.logE("Problem with message " + reply.toString(2));
-             }
-            else {
-               LspLog.logD("Process unused message " + reply.toString(2));
-             }
-          }
-       }
-      else {
-         LspLog.logD("Handle reply: " + id + "\n" + reply.toString(2));
-         processReply(id,reply.opt("result"));
-       }
+      // might want a single message processor rather than separate threads
+      MessageProcessor mp = new MessageProcessor(reply);
+      LspBaseMain lsp = LspBaseMain.getLspMain();
+      lsp.startTask(mp);
     }
 
 
@@ -883,12 +862,48 @@ private class MessageReader extends Thread {
 
 
 
+private class MessageProcessor implements Runnable {
+   
+   private JSONObject reply_json;
+   
+   MessageProcessor(JSONObject reply) {
+      reply_json = reply;
+    }
+   
+   @Override public void run() {
+      int id = reply_json.optInt("id");
+      String method = reply_json.optString("method",null);
+      JSONObject err = reply_json.optJSONObject("error");
+      if (err != null) {
+         processError(id,err);
+       }
+      else if (id == 0 || pending_map.get(id) == null) {
+         if (method != null) {
+            Object params = reply_json.opt("params");
+            processNotification(id,method,params);
+          }
+         else {
+            String rslt = reply_json.optString("result",null);
+            if (rslt != null) {
+               LspLog.logE("Problem with message " + reply_json.toString(2));
+             }
+            else {
+               LspLog.logD("Process unused message " + reply_json.toString(2));
+             }
+          }
+       }
+      else {
+         LspLog.logD("Handle reply: " + id + "\n" + reply_json.toString(2));
+         processReply(id,reply_json.opt("result"));
+       }
+    }
+}
 private class ErrorReader extends Thread {
 
    private BufferedReader input_reader;
 
    ErrorReader(InputStream ist) {
-      super("LSP_ERROR_READER_" + client_id);
+      super("LSP_Error_Reader_" + client_id);
       input_reader = new BufferedReader(new InputStreamReader(ist));
     }
 

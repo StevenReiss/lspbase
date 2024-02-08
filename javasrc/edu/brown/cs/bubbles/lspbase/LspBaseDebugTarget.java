@@ -130,6 +130,12 @@ LspBaseBreakpoint findBreakpoint(int id)
 }
 
 
+LspBaseBreakpoint findBreakpoint(String exception)
+{
+   return debug_manager.findBreakpoint(exception);
+}
+
+
 LspBaseLanguageData getLanguageData()
 {
    File f = launch_config.getFileToRun();
@@ -271,6 +277,7 @@ private JSONObject fixDebugInfo(JSONObject data)
 	       sub = launch_config.getToolArguments();
 	       break;
             case "$DEVICE" :
+               sub = "-d " + launch_config.getDevice();
                // add -d <DEVICE> from launch config
                break;
 	    default :
@@ -309,10 +316,7 @@ void debugAction(LspBaseDebugAction action,String threadid,String frameid,IvyXml
          case RESUME :
             for (LspBaseDebugThread thrd : thread_data.values()) {
                if (thrd.isStopped()) {
-                  debug_protocol.sendRequest("continue",null,
-                        "threadId",thrd.getId(),"singleThread",false);
-                  xw.textElement("TARGET",action.toString());
-                  return;
+                  thrd.debugAction(action,null);
                 }
              }
        }
@@ -424,7 +428,9 @@ void getVariableValue(String tid,String fid,String var,int saveid,int depth,int 
 {
    for (LspBaseDebugThread thrd : thread_data.values()) {
       if (matchThread(tid,thrd)) {
-         thrd.getVariableValue(fid,var,saveid,depth,arr,detail,xw);
+         if (thrd.isStopped()) {
+            thrd.getVariableValue(fid,var,saveid,depth,arr,detail,xw);
+          }
          break;
        }
     }

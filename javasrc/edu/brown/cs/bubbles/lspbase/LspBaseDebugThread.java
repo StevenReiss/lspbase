@@ -49,6 +49,7 @@ private String  thread_name;
 private ThreadState thread_state;
 private LspBaseDebugTarget debug_target;
 private List<LspBaseBreakpoint> cur_breakpoints;
+private String  thread_exception;
 
 private static Map<String,String> detail_map;
 
@@ -80,7 +81,7 @@ LspBaseDebugThread(LspBaseDebugTarget tgt,int id,boolean first)
    cur_breakpoints = null;
    thread_name = "Thread_" + id;
    if (first) thread_name = "Main Thread";
-         
+   thread_exception = null;      
 }
 
 
@@ -194,7 +195,7 @@ boolean debugAction(LspBaseDebugAction action,String frameid)
       throws LspBaseException
 {
    LspBaseDebugProtocol proto = debug_target.getDebugProtocol();
-   ActionStatus sts = new ActionStatus();
+   ActionStatus sts = new ActionStatus(action);
    switch (action) {
       case NONE :
          break;
@@ -292,11 +293,12 @@ void getVariableValue(String fid,String var,int saveid,int depth,int arr,
             "variableReference",saveid);
       
       JSONArray vars = vl.getVariables();
-      
-      for (int i = 0; i < vars.length(); ++i) {
-         JSONObject va = vars.getJSONObject(i);
-         LspBaseDebugVariable vd = new LspBaseDebugVariable(va,this);
-         vd.outputValue(xw);
+      if (vars != null) {
+         for (int i = 0; i < vars.length(); ++i) {
+            JSONObject va = vars.getJSONObject(i);
+            LspBaseDebugVariable vd = new LspBaseDebugVariable(va,this);
+            vd.outputValue(xw);
+          }
        }
     }
    xw.end("VALUE");
@@ -332,15 +334,31 @@ private class VariableLoader implements LspJsonResponder {
 private class ActionStatus implements LspJsonResponder {
    
    private boolean is_error;
+   private boolean do_continue;
    
-   ActionStatus() {
+   ActionStatus(LspBaseDebugAction action) {
       is_error = true;
+      switch (action) {
+         case RESUME :
+         case STEP_INTO :
+         case DROP_TO_FRAME :
+         case STEP_OVER :
+         case STEP_RETURN :
+            do_continue = true;
+            break;
+         default :
+            do_continue = false;
+            break;
+       }
     }
    
    boolean isOkay()                             { return !is_error; }
    
    @Override public void handleResponse(JSONObject data) {
       is_error = false;
+      if (do_continue) {
+         handleContinued(null);
+       }
     }
    
 }       // end of inner class ActionStatus
@@ -366,13 +384,20 @@ void setState(String state)
          break;
     }
 }
+
+
 void handleStopped(JSONObject data)             
 {
    thread_state = ThreadState.STOPPED;
    String reason = data.getString("reason");
    String detail = detail_map.get(reason);
    String text = data.optString("text",null);
-   JSONArray arr = data.optJSONArray("hitBreakpointIds");
+   
+   if (detail != null && detail.equals("EXCEPTION")) {
+      thread_exception = text;
+    }
+   
+   JSONArray arr = data.optJSONArray("RESUMEhitBreakpointIds");
    if (arr != null) {
       cur_breakpoints = new ArrayList<>();
       for (int i = 0; i < arr.length(); ++i) {
@@ -381,16 +406,31 @@ void handleStopped(JSONObject data)
          if (bpt != null) cur_breakpoints.add(bpt);
        }
     }
-   debug_target.postThreadEvent(this,"CHANGE",detail,text,false);
+   else if (detail.equals("EXCEPTION")) {
+      cur_breakpoints = new ArrayList<>();
+      if (text == null) text = detail;
+      LspBaseBreakpoint bpt = debug_target.findBreakpoint(text); 
+      if (bpt != null) {
+         cur_breakpoints.add(bpt);
+       }
+    }
+   
+   debug_target.postThreadEvent(this,"SUSPEND",detail,text,false);
 }
+
+
 void handleContinued(JSONObject data)           
 { 
    thread_state = ThreadState.RUNNING;
+   thread_exception = null;
    cur_breakpoints = null;
    debug_target.postThreadEvent(this,"CHANGE",null,null,false);
 }
+
+
 void handleTerminated()                        
 { 
+   thread_exception = null;
    thread_state = ThreadState.TERMINATED;
    // possibly keep restart data here
    debug_target.postThreadEvent(this,"CHANGE",null,null,false);
@@ -410,7 +450,7 @@ void outputXml(IvyXmlWriter xw)
    String nm = getName();
    if (nm != null) xw.field("NAME",nm);
    else {
-      
+      xw.field("NAME","<< Unnamed Thread >>");
     }
    xw.field("ID",getId());
    xw.field("STACK",thread_state == ThreadState.STOPPED);
@@ -419,6 +459,9 @@ void outputXml(IvyXmlWriter xw)
    xw.field("TERMINATED",thread_state == ThreadState.TERMINATED);
    xw.field("SUSPENDED",thread_state == ThreadState.STOPPED);
    xw.field("PID", debug_target.getId());
+   if (thread_exception != null) {
+      xw.field("EXCEPTION",thread_exception);
+    }
    debug_target.outputLaunch(xw); 
    if (cur_breakpoints != null) {
       for (LspBaseBreakpoint bpt : cur_breakpoints) {

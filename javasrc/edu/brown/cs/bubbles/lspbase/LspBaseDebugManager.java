@@ -32,6 +32,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -496,6 +497,22 @@ Iterable<LspBaseBreakpoint> getBreakpoints()
 LspBaseBreakpoint findBreakpoint(int id)
 {
    return break_ids.get(id);
+}
+
+
+LspBaseBreakpoint findBreakpoint(String exception)
+{
+   StringTokenizer tok = new StringTokenizer(exception," (");
+   String etyp = tok.nextToken();
+   
+   LspBaseBreakpoint dflt = null;
+   for (LspBaseBreakpoint pb : break_map.values()) {
+      if (pb.getType() == BreakType.EXCEPTION) {
+         if (pb.getException() == null || pb.getException().isEmpty()) dflt = pb; 
+         else if (pb.getException().equals(etyp)) return pb;
+       }
+    }
+   return dflt;
 }
 
 
