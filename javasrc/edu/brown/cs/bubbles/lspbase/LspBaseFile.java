@@ -1435,10 +1435,12 @@ void getCompletions(String bid,int offset,IvyXmlWriter xw)
    throws LspBaseException
 {
    LspBaseProtocol proto = for_project.getProtocol();
+   JSONObject ctxt = createJson("triggerKind",1);
    proto.sendWorkMessage("textDocument/completion",
 	 new CompletionHandler(xw),
 	 "textDocument",getTextDocumentId(),
-	 "position",proto.createPosition(this,offset));
+	 "position",proto.createPosition(this,offset),
+         "context",ctxt);
 }
 
 
@@ -1795,12 +1797,12 @@ private class CreatePrivateBufferTask implements Runnable {
       PrivateBuffer pbf = private_buffers.get(buffer_pid);
       if (pbf == null) return;
       JSONObject docitm = createJson("uri",pbf.getPrivateUri(),"languageId",file_language,
-	    "version",pbf.getVersion(),"text",pbf.getBufferContents());
+            "version",pbf.getVersion(),"text",pbf.getBufferContents());
       try {
-	 proto.sendMessage("textDocument/didOpen","textDocument",docitm);
+         proto.sendMessage("textDocument/didOpen","textDocument",docitm);
        }
       catch (LspBaseException e) {
-	 LspLog.logE("Problem opening private buffer",e);
+         LspLog.logE("Problem opening private buffer",e);
        }
     }
 

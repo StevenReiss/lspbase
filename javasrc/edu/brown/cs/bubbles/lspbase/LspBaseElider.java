@@ -246,9 +246,10 @@ boolean computeElision(IvyXmlWriter xw) throws LspBaseException
       if (abort_elision) return false;
       data.outputElision(xw);
       
-      LspLog.logD("ELISION END");
+      LspLog.logD("ELISION FINISH");
     }
    finally {
+      LspLog.logD("ELISION END");
       synchronized (this) {
          doing_elision = false;
          abort_elision = false;
@@ -340,7 +341,7 @@ private int fixFoldEndOffset(JSONObject fold,int soff,int eoff)
 {
    try {
       int scol = fold.optInt("startCharacter",0)+1;
-      if (soff + scol -1 >= file_contents.length()) return eoff;
+      if (soff + scol - 1 >= file_contents.length()) return eoff;
       
       char prevch = file_contents.charAt(soff+scol-1);
       if (eoff > file_contents.length()) eoff = file_contents.length();
@@ -352,6 +353,7 @@ private int fixFoldEndOffset(JSONObject fold,int soff,int eoff)
                if (ch == '\n') {
                   return i+1;
                 }
+               else if (!Character.isWhitespace(ch)) break;
              }
           }
        }

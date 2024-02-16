@@ -311,6 +311,7 @@ void debugAction(LspBaseDebugAction action,String threadid,String frameid,IvyXml
                debug_protocol.sendRequest("terminate",null,
                      "restart",false);
                xw.textElement("TARGET",action.toString());
+               debug_manager.removeDebugProtocol(this);
              }
             return;
          case RESUME :
@@ -500,6 +501,7 @@ void processEvent(String event,JSONObject body)
 	  }
 	 thread_data.clear();
 	 if (process_data != null) process_data.handleTerminated();
+         else postProcessEvent("TERMINATE");
 	 break;
       case "output" :
 	 handleOutput(body);

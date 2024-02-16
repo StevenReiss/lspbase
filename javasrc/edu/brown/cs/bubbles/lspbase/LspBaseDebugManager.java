@@ -273,6 +273,15 @@ LspBaseDebugProtocol getDebugProtocol(LspBaseDebugTarget tgt)
 
 
 
+void removeDebugProtocol(LspBaseDebugTarget tgt)
+{
+   synchronized (debug_protocols) {
+      debug_protocols.remove(tgt);
+    }
+}
+
+
+
 
 
 
@@ -840,9 +849,12 @@ private void updateBreakpointsForFile(LspBaseFile lbf) throws LspBaseException
     }
    for (LspBaseDebugProtocol proto : debug_protocols.values()) {
       if (proto.getLanguage() == lbf.getLanguageData()) {
-	 BreakpointsSet setter = new BreakpointsSet(use);
-	 proto.sendEarlyRequest("setBreakpoints",setter,
-	       "source",src,"breakpoints",bpts,"sourceModified",true);
+         try {
+            BreakpointsSet setter = new BreakpointsSet(use);
+            proto.sendEarlyRequest("setBreakpoints",setter,
+                  "source",src,"breakpoints",bpts,"sourceModified",true);
+          }
+         catch (Throwable e) { }
        }
     }
 }
