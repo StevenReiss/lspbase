@@ -1,6 +1,7 @@
 <project name='lspbase' default='all'>
 
    <target name='all'>
+      <mkdir dir="java" />
       <ant antfile="build.xml" dir="src" />
    </target>
 
