@@ -506,6 +506,9 @@ void processEvent(String event,JSONObject body)
       case "output" :
 	 handleOutput(body);
 	 break;
+      case "progressOutput" :
+         handleProgress(body);
+         break;
     }
 }
 
@@ -613,6 +616,15 @@ private void handleOutput(JSONObject body)
 	 sendConsoleOutput(txt,true);
 	 break;
     }
+}
+
+
+private void handleProgress(JSONObject body)
+{
+   String txt = body.getString("message");
+   txt = txt.replace("\u2022","*");
+   
+   sendConsoleOutput(txt,false);
 }
 
 

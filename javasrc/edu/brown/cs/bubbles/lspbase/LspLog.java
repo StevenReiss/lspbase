@@ -55,6 +55,17 @@ static void setLogLevel(LspBaseLogLevel lvl)
 
 static void setLogFile(File f)
 {
+   String f1 = f.getPath();
+   if (f1.endsWith(".log")) {
+      int idx = f1.lastIndexOf(".");
+      f1 = f1.substring(0,idx+1) + ".save";
+    }
+   else {
+      f1 = f1 + ".save";
+    }
+   File f2 = new File(f1);
+   f.renameTo(f2);
+   
    try {
       log_file = new PrintStream(new FileOutputStream(f),true);
     }

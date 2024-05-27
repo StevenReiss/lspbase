@@ -507,7 +507,8 @@ void processEvent(JSONObject resp)
       case "continued" :
       case "output" :
       case "terminated" :
-	 debug_target.processEvent(event,body);
+      case "progressUpdate" :
+         debug_target.processEvent(event,body);
 	 break;
       case "exited" :
 	 break;
