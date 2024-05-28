@@ -158,15 +158,17 @@ private void processResult(JSONObject data,String what)
    if (range != null && what.equals("REFS")) {
       int off0 = lbf.mapRangeToStartOffset(range);
       int off1 = lbf.mapRangeToEndOffset(range);
-      Segment seg = lbf.getSegment(off0,off1-off0);
-      int delta = 0;
-      while (!Character.isJavaIdentifierStart(seg.charAt(delta))) {
-         ++delta;
-       }
-      if (delta > 0) {
-         JSONObject rangestart = range.getJSONObject("start");
-         int cpos = rangestart.getInt("character");
-         rangestart.put("character",cpos+delta);
+      if (off1 > off1) {
+         Segment seg = lbf.getSegment(off0,off1-off0);
+         int delta = 0;
+         while (delta < seg.length() && !Character.isJavaIdentifierStart(seg.charAt(delta))) {
+            ++delta;
+          }
+         if (delta > 0) {
+            JSONObject rangestart = range.getJSONObject("start");
+            int cpos = rangestart.getInt("character");
+            rangestart.put("character",cpos+delta);
+          }
        }
     }
    

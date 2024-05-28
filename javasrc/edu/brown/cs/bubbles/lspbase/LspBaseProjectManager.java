@@ -601,9 +601,10 @@ void handleEditParam(String proj,String bid,String name,String value)
 void handleStartFile(String proj,String bid,String file,IvyXmlWriter xw)
    throws LspBaseException
 {
-   LspBaseProject lbp = findProject(proj);
-   if (lbp == null) throw new LspBaseException("Project " + proj + " not found");
-   LspBaseFile lbf = lbp.findFile(file);
+   LspBaseFile lbf = findFile(proj,file);
+// LspBaseProject lbp = findProject(proj);
+// if (lbp == null) throw new LspBaseException("Project " + proj + " not found");
+// LspBaseFile lbf = lbp.findFile(file);
    if (lbf == null) throw new LspBaseException("File " + file + " not found for project " + proj);
    lbf.open(bid);
 }

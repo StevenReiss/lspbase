@@ -775,6 +775,7 @@ void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolea
    LspBaseFindResult rslt = new LspBaseFindResult(this,file,defs,refs,
 	 impls,type,ronly,wonly);
 
+   try {
    if (refs) {
       use_protocol.sendWorkMessage("textDocument/references",
 	    new FindResponder(rslt,"REFS"),
@@ -816,6 +817,11 @@ void findAll(LspBaseFile file,int start,int end,boolean defs,boolean refs,boolea
 	    new FindResponder(rslt,"IMPL"),
 	    "textDocument",file.getTextDocumentId(),
 	    "position",createJson("line",lc.getLspLine(),"character",lc.getLspColumn()));
+    }
+    }
+   catch (LspBaseException e) {
+      if (e.getMessage().contains("Protocol error")) return;
+      throw e;
     }
 
 
