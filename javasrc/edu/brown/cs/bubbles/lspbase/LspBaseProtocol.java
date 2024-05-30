@@ -608,6 +608,8 @@ void processNotification(Integer id,String method,Object params)
       case "window/logMessage" :
 	 handleLogMessage(id,jparams);
 	 break;
+      case "window/showMessage" :
+         break;
       default :
 	 LspLog.logE("Unknown notification " + method);
 	 break;
@@ -909,11 +911,11 @@ private class ErrorReader extends Thread {
 
    @Override public void run() {
       try {
-	 for ( ; ; ) {
-	    String l = input_reader.readLine();
-	    if (l == null) break;
-	    LspLog.logE("Protocol error: " + l);
-	  }
+         for ( ; ; ) {
+            String l = input_reader.readLine();
+            if (l == null) break;
+            LspLog.logE("Protocol error: " + l);
+          }
        }
       catch (IOException e) { return; }
     }
