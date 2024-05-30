@@ -948,10 +948,18 @@ private class ElideNode implements Comparable<ElideNode>, LspJsonResponder {
                LspLog.logE("Overlapping node add " + start + " " + end + " " +
                      cn.start_offset + " " + cn.end_offset);
                // overlap -- ignore; first restore any removed children
+               // check for minor overrides and correct start/end
                if (cn.child_nodes != null) {
                   for (ElideNode en1 : cn.child_nodes) {
                      addChild(en1);
                    }
+                }
+               if (start < cn.end_offset && 
+                     cn.end_offset - start <= 2 &&
+                     end > cn.end_offset + 2) {
+                  start = cn.end_offset+1;
+                  child.start_offset = start;
+                  return addNode(child,start,end);
                 }
                return null;
              }
