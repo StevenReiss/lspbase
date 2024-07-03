@@ -290,7 +290,7 @@ void getVariableValue(String fid,String var,int saveid,int depth,int arr,
    else {
       VariableLoader vl = new VariableLoader();
       proto.sendRequest("variables",vl,
-            "variableReference",saveid);
+            "variablesReference",saveid);
       
       JSONArray vars = vl.getVariables();
       if (vars != null) {

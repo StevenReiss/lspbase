@@ -25,6 +25,7 @@ package edu.brown.cs.bubbles.lspbase;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,6 +34,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.StringTokenizer;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -1010,6 +1012,80 @@ void findByKey(LspBaseFile lbf,String key,IvyXmlWriter xw)
 
 
 /********************************************************************************/
+/*                                                                              */
+/*      Creation methods                                                        */
+/*                                                                              */
+/********************************************************************************/
+
+void handleCreatePackage(String dir,boolean force,IvyXmlWriter xw)
+{
+   File base = findSourceFile(dir);
+   if (base == null) return;
+   
+   LspLog.logD("CREATE PACKAGE " + dir + " " + base);
+   if (!base.mkdirs()) return;
+   
+   xw.begin("PACKAGE");
+   xw.field("NAME",dir);
+   xw.field("PATH",base.getPath());
+   xw.end("PACKAGE");
+}
+
+
+
+void handleCreateClass(String name,boolean force,String cnts,IvyXmlWriter xw)
+      throws LspBaseException
+{
+   if (name == null) return;
+   
+   File src = findSourceFile(name);
+   LspLog.logD("CREATE FILE " + name + " " + src);
+   if (src == null) return;
+ 
+   // handle line separator
+   try (FileWriter fw = new FileWriter(src)) {
+      fw.write(cnts);
+    }
+   catch (IOException e) {
+      throw new LspBaseException("Problem creating file",e);
+    }
+   
+   LspBaseFile lbf = addLspFile(src,true);
+   didCreateFile(lbf);
+}
+
+
+
+private File findSourceFile(String name)
+{
+   LspBaseLanguageData ld = getLanguageData();
+   File base = null;
+   if (!name.startsWith("/")) {
+      for (LspBasePathSpec ps : project_paths) {
+         if (ps.isUser()) {
+            base = ps.getFile();
+            break;
+          }
+       }
+      if (base == null) return null;
+      String d1 = ld.getCapabilityString("lsp.projects.defaultSource");
+      if (d1 != null) base = new File(base,d1);
+    }
+   else base = new File("");
+   
+   StringTokenizer tok = new StringTokenizer(name,"/");
+   while (tok.hasMoreTokens()) {
+      String comp = tok.nextToken();
+      base = new File(base,comp);
+    }
+   
+   return base;
+}
+
+
+
+
+/********************************************************************************/
 /*										*/
 /*	Delete and Rename methods						*/
 /*										*/
@@ -1128,6 +1204,24 @@ void didCloseFile(LspBaseFile lbf) throws LspBaseException
 {
    use_protocol.sendMessage("textDocument/didClose",
 	 "textDocument",lbf.getTextDocumentId());
+   
+   IvyXmlWriter xw = lsp_base.beginMessage("RESOURCE");
+   outputDelta(xw,"CHANGED",lbf);
+   lsp_base.finishMessage(xw);
+}
+
+
+void didCreateFile(LspBaseFile lbf) throws LspBaseException
+{
+   if (lbf.getLanguageData().getCapability("workspace.fileOperations.didCreate") != null) {
+      JSONArray arr = createJsonArray(lbf.getTextDocumentId());
+      use_protocol.sendMessage("workspace/didCreateFiles",
+            "files",arr);
+    }
+   
+   IvyXmlWriter xw = lsp_base.beginMessage("RESOURCE");
+   outputDelta(xw,"ADDED",lbf);
+   lsp_base.finishMessage(xw);
 }
 
 

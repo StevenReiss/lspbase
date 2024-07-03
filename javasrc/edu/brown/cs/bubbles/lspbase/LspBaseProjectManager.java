@@ -322,9 +322,6 @@ void handleCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
          handleEditProject(proj,
                IvyXml.getChild(xml,"PROJECT"),xw);
          break;
-
-      case "CREATEPACKAGE" :
-      case "CREATECLASS" :
       default :
 	 LspLog.logE("Unknown project command " + cmd);
 	 break;
@@ -459,6 +456,22 @@ void handleEditCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
                IvyXml.getAttrInt(xml,"START"),
                IvyXml.getAttrInt(xml,"END"),xw);
          break;
+       
+      case "CREATEDIRECTORY" :
+      case "CREATEPACKAGE" :
+         handleCreatePackage(proj,IvyXml.getAttrString(xml,"NAME"),
+	       IvyXml.getAttrBool(xml,"FORCE",false),xw);
+         break;
+      case "CREATEFILE" :
+      case "CREATECLASS" :
+         handleCreateClass(proj,IvyXml.getAttrString(xml,"NAME"),
+	       IvyXml.getAttrBool(xml,"FORCE",false),
+	       IvyXml.getTextElement(xml,"CONTENTS"), xw);
+         break;
+         
+      default :
+	 LspLog.logE("Unknown project edit command " + cmd);
+	 break;     
     }
 }
 
@@ -801,6 +814,28 @@ void handleHoverData(String proj,String bid,String file,
    lbf.hoverData(bid,start,end,xw);
 }
 
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Handle CREATECLASS (file) and CREATEPACKAGE (directory)                 */
+/*                                                                              */
+/********************************************************************************/
+
+void handleCreatePackage(String proj,String dir,boolean force,IvyXmlWriter xw)
+      throws LspBaseException
+{
+   LspBaseProject lbp = findProject(proj);
+   lbp.handleCreatePackage(dir,force,xw); 
+}
+
+
+void handleCreateClass(String proj,String name,boolean force,String cnts,IvyXmlWriter xw)
+      throws LspBaseException
+{
+   LspBaseProject lbp = findProject(proj);
+   lbp.handleCreateClass(name,force,cnts,xw); 
+}
 
 /********************************************************************************/
 /*                                                                              */

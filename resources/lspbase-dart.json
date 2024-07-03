@@ -41,7 +41,7 @@
 	     },
 	    "fileOperations" : {
 	       "dynamicRegistration" : false,
-	       "didCreate" : false,
+	       "didCreate" : true,
 	       "willCreate" : false,
 	       "didRename" : false,
 	       "willRename" : false,
@@ -364,6 +364,7 @@
 	"nest" : true,
 	"projectTypes" : [ "DART", "NEWDART", "FLUTTER", "NEWFLUTTER" ],
 	"userDirectories" : [ "lib", "resources" ],
+	"defaultSource" : "lib",
 	"dart" : {
 	   "kind" : "SOURCE"
 	 },

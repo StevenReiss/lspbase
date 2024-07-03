@@ -228,9 +228,7 @@ private String handleCommand(String cmd,String proj,Element xml) throws LspBaseE
       case "BUILDPROJECT" :
       case "CREATEPROJECT" :
       case "EDITPROJECT" :
-      case "CREATEPACKAGE" :
       case "FINDPACKAGE" :
-      case "CREATECLASS" :
       case "PATTERNSEARCH" :
       case "SEARCH" :
       case "FINDBYKEY" :
@@ -261,6 +259,10 @@ private String handleCommand(String cmd,String proj,Element xml) throws LspBaseE
       case "DELETE" :
       case "RENAMERESOURCE" :
       case "HOVERDATA" :
+      case "CREATEDIRECTORY" :
+      case "CREATEPACKAGE" :
+      case "CREATEFILE" :
+      case "CREATECLASS" :
          lsp_base.getProjectManager().handleEditCommand(cmd,proj,xml,xw);
          break;
       case "LAUNCHQUERY" :

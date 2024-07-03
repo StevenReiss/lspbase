@@ -231,6 +231,14 @@ public void outputXml(IvyXmlWriter xw)
 }
 
 
+@Override public String toString()
+{
+   String rslt = directory_file.getPath();
+   if (is_user) rslt += "@";
+   if (is_nested) rslt += "^";
+   return rslt;
+}
+
 }	// end of class LspBasePathSpec
 
 
