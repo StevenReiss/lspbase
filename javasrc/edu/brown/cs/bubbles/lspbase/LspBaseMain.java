@@ -101,6 +101,9 @@ static {
    String dapcmd = "flutter debug_adapter";
    exec_map.put("dart",new LspBaseLanguageData("dart",dartcmd,
 	 dapcmd,false));
+   String tscmd = "typescript-language-server --stdio";
+   tscmd += " --log-level 4";
+   exec_map.put("ts",new LspBaseLanguageData("ts",tscmd,null,false));
 }
 
 
