@@ -553,7 +553,6 @@ private Object getPropertyValue(Element pelt)
 
 
 
-@SuppressWarnings("unused")
 private String propString(String k)
 {
    Object v = prop_map.get(k);

@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.HashMap;
 import java.util.Map;
 
 import org.w3c.dom.Element;
@@ -75,6 +76,24 @@ private MintControl	mint_control;
 private String		instance_id;
 private Element 	last_runevent;
 private String		last_endnames;
+private String          language_name;
+private LanguageData    language_data;
+
+private static Map<String,LanguageData> language_map;
+
+static {
+   language_map = new HashMap<>();
+   language_map.put("dart",
+         new LanguageData("alds",
+               " Lsp/test",
+               "/pro/iot/flutter/alds/lib/main.dart",
+               "main.dart;initialize()"));
+   language_map.put("ts",
+         new LanguageData("iqsign",
+               "Lsp/test1",
+               "/pro/iot/iqsign/server.js",
+               "server.js;errorHandler()"));
+}
 
 
 
@@ -86,6 +105,9 @@ private String		last_endnames;
 
 private LspBaseTest(String [] args)
 {
+   language_name = null;
+   scanArgs(args);
+  
    mint_control = MintControl.create("LSPBASETEST",MintSyncMode.ONLY_REPLIES);
    mint_control.register("<LSPBASE TYPE='_VAR_0' />",new MessageHandler());
    instance_id = "LSPBASE_id";
@@ -93,6 +115,39 @@ private LspBaseTest(String [] args)
    last_endnames = null;
 }
 
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Handle options                                                          */
+/*                                                                              */
+/********************************************************************************/
+
+private void scanArgs(String [] args)
+{
+   for (int i = 0; i < args.length; ++i) {
+      if (args[i].startsWith("-")) {
+         if (args[i].startsWith("-lang") && i+1 < args.length) {
+            language_name = args[++i];
+          }
+         else badArgs();
+       }
+      else {
+         if (language_name == null) language_name = args[i];
+         else badArgs();
+       }
+    }
+   if (language_name == null) language_name = "dart";
+   language_data = language_map.get(language_name);
+   if (language_data == null) badArgs();
+}
+
+
+private void badArgs()
+{
+   System.err.println("LspBaseTest [-lang <dart|ts>]");
+   System.exit(1);
+}
 
 
 /********************************************************************************/
@@ -108,9 +163,9 @@ private void runTest()
 
    start();
 
-   String proj = "alds";
-   String ws = "/Users/spr/Lsp/test";
-   String fil = "/pro/iot/flutter/alds/lib/main.dart";
+   String proj = language_data.getProject();
+   String ws = language_data.getWorkspace();
+   String fil = language_data.getFile();
    int editid = 1;
 
    sendCommand("PING",null,null,null);
@@ -131,7 +186,7 @@ private void runTest()
    sendCommand("OPENPROJECT",proj,
 	 new CommandArgs("PATHS",true),null);
    sendCommand("PATTERNSEARCH",proj,
-	 new CommandArgs("PATTERN","main.dart;initialize()","DEFS",true,"REFS",false,
+	 new CommandArgs("PATTERN",language_data.getSearchFor(),"DEFS",true,"REFS",false,
 	       "FOR","METHOD"),null);
    sendCommand("EDITPARAM",null,
 	 new CommandArgs("NAME","AUTOELIDE","VALUE",true),null);
@@ -325,15 +380,16 @@ private void waitForNames()
 
 private void setupFiles()
 {
-   String home = System.getProperty("user.home");
-
+   String ws = language_data.getWorkspace();
    try {
-      IvyFile.remove(home + "/Lsp/test/alds");
-      IvyFile.remove(home + "/Lsp/test/Track");
-      IvyFile.remove(home + "/Lsp/test/.projects");
+      File fws = new File(ws);
+      fws.mkdirs();
+      IvyFile.remove(ws + "/" + language_data.getProject());
+      IvyFile.remove(ws + "Track");
+      IvyFile.remove(ws + ".projects");
     }
    catch (IOException e) {
-      System.err.println("Problme removing old files: " + e);
+      System.err.println("Problem removing old files: " + e);
       System.exit(1);
     }
 }
@@ -341,19 +397,23 @@ private void setupFiles()
 
 private void setupProject()
 {
-   String home = System.getProperty("user.home");
-   String pfile = home + "/Lsp/test/.projects";
-   String pdir = home + "/Lsp/test/alds";
+   String ws = language_data.getWorkspace();
+   String pfile = ws + "/.projects";
+   String pdir = ws + "/" + language_data.getProject();
    File pdirf = new File(pdir);
    pdirf.mkdirs();
    File ppfile = new File(pdirf,PROJECT_DATA_FILE);
 
    String pdef = "<PROJECTS>\n" +
-	 "<PROJECT NAME='alds' PATH='/Users/spr/Lsp/test/alds' />\n" +
+	 "<PROJECT NAME='" + language_data.getProject() + "'" +
+         " PATH='" + pdir + "' />\n" +
 	 "</PROJECTS>\n";
 
-   String tdef = "<PROJECT LANGUAGE='dart' NAME='alds' BASE='/Users/spr/Lsp/test/alds'>\n" +
-	       "<PATH SOURCE='/pro/iot/flutter/alds' TYPE='INCLUDE' NEST='true' />\n" +
+   String tdef = "<PROJECT LANGUAGE='" + language_name + "'" +
+               " NAME='" + language_data.getProject() + "'" +
+               " BASE='" + pdir + "'>\n" +
+	       "<PATH SOURCE='" + language_data.getSourcePath() + "'" + 
+               " TYPE='INCLUDE' NEST='true' />\n" +
 	       "<PATH SOURCE='**/bBACKUP' TYPE='EXCLUDE' />\n" +
 	       "</PROJECT>";
 
@@ -382,7 +442,7 @@ private void start()
       Runner r = new Runner();
       r.start();
       LspLog.logI("LSPBASETEST: STARTING");
-      for (int i = 0; i < 500; ++i) {
+      for (int i = 0; i < 5000; ++i) {
 	 if (tryPing()) break;
 	 try {
 	    Thread.sleep(1000);
@@ -406,14 +466,17 @@ private class Runner extends Thread {
 
    @Override public void run() {
       try {
-	 LspLog.logI("LSPBASETEST: Begin");
-	 LspBaseMain.main(new String [] { "-m", "LSPBASETEST", "-ws", "/Users/spr/Lsp/test",
-	       "-log", "/pro/lspbase/lspbase/src/test.log"});
-	 LspLog.logI("LSPBASETEST: Start run");
+         LspLog.logI("LSPBASETEST: Begin");
+         LspBaseMain.main(new String [] { "-m", "LSPBASETEST", 
+               "-ws", language_data.getWorkspace(),
+               "-log", "/pro/lspbase/lspbase/src/test.log",
+               "-lang", language_name
+          });
+         LspLog.logI("LSPBASETEST: Start run");
        }
       catch (Throwable t) {
-	 LspLog.logE("LSPBASETEST: Error running: " + t);
-	 t.printStackTrace();
+         LspLog.logE("LSPBASETEST: Error running: " + t);
+         t.printStackTrace();
        }
       LspLog.logI("LSPBASETEST: Finish run");
     }
@@ -494,12 +557,12 @@ private static class ReplyHandler extends MintDefaultReply {
       String rslt = waitForString();
       result_value = rslt;
       if (rslt == null) {
-	 LspLog.logI("LSPBASETEST: No reply for " + cmd_name);
+         LspLog.logI("LSPBASETEST: No reply for " + cmd_name);
        }
       else {
-	 LspLog.logI("LSPBASETEST: Reply for " + cmd_name + ":");
-	 LspLog.logI(rslt);
-	 LspLog.logI("LSPBASETEST: End of reply");
+         LspLog.logI("LSPBASETEST: Reply for " + cmd_name + ":");
+         LspLog.logI(rslt);
+         LspLog.logI("LSPBASETEST: End of reply");
        }
     }
 
@@ -548,6 +611,42 @@ private class MessageHandler implements MintHandler {
 }	// end of inner class MessageHandler
 
 
+
+
+/********************************************************************************/
+/*                                                                              */
+/*      Language data                                                           */
+/*                                                                              */
+/********************************************************************************/
+
+private static class LanguageData {
+   
+   private String project_name;
+   private String workspace_name;
+   private String file_name;
+   private String search_for;
+   
+   LanguageData(String pnm,String wnm,String fnm,String search) {
+      project_name = pnm;
+      if (!wnm.startsWith("/")) wnm = System.getProperty("user.home") + "/" + wnm;
+      workspace_name = wnm;
+      file_name = fnm;
+      search_for = search;
+    }
+   
+   String getProject()                          { return project_name; }
+   String getWorkspace()                        { return workspace_name; }
+   String getFile()                             { return file_name; }
+   String getSearchFor()                        { return search_for; }
+   
+   String getSourcePath() {
+      File f1 = new File(file_name);
+      File f2 = f1.getParentFile();
+      if (f2.getName().equals("lib")) f2 = f2.getParentFile();
+      return f2.getPath();
+    }
+   
+}       // end of inner class LanguageData
 
 
 

@@ -482,10 +482,10 @@ private class Pinger extends TimerTask {
       if (shutdown_mint) return;
       if (num_clients == 0) return;
       IvyXmlWriter xw = beginMessage("PING");
-      String rslt = finishMessageWait(xw,1000);
+      String rslt = finishMessageWait(xw,10000);
       if (rslt == null) {
          ++error_count;
-         if (error_count > 3) {
+         if (error_count > 30) {
             num_clients = 0;
             shutdown_mint = true;
             mint_control.shutDown();

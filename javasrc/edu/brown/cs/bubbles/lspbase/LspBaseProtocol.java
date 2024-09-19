@@ -111,7 +111,9 @@ LspBaseProtocol(File workspace,List<LspBasePathSpec> paths,LspBaseLanguageData l
       ErrorReader er = new ErrorReader(err);
       er.start();
     }
-   catch (IOException e) { }
+   catch (IOException e) { 
+      LspLog.logE("Problem starting server",e);
+    }
 
    is_initialized = false;
    doing_initialization = false;
@@ -214,7 +216,12 @@ void initialize() throws LspBaseException
     }
    localSendMessage("initialize",this::handleInit,true,obj);
 
-   localSendMessage("initialized",true,new JSONObject());
+   try {
+      localSendMessage("initialized",true,new JSONObject());
+    }
+   catch (LspBaseException e) {
+      LspLog.logD("Initialized message not handled");
+    }
 
    synchronized (this) {
       doing_initialization = false;
