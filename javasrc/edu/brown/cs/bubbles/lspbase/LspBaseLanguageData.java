@@ -55,6 +55,7 @@ private JSONObject client_configuration;
 private JSONObject dap_configuration;
 private boolean single_workspace;
 private Set<String> file_extensions;
+private File       debuy_file;
 
 
 

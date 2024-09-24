@@ -25,6 +25,7 @@ package edu.brown.cs.bubbles.lspbase;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -70,6 +71,7 @@ private Writer message_stream;
 private Map<String,File> pathWorkspaceMap;
 private Map<File,List<LspBasePathSpec>> workspacePathMap;
 private Set<String> active_progress;
+private FileWriter lsp_input;
 
 
 
@@ -97,6 +99,17 @@ LspBaseProtocol(File workspace,List<LspBasePathSpec> paths,LspBaseLanguageData l
    String command = ld.getLspExecString();
    Map<String,String> keys = new HashMap<>();
    keys.put("ID","LspBase_" + ld.getName() + "_" + workspace.getName());
+   
+   String s = ld.getCapabilityString("lsp.debugFile");
+   lsp_input = null;
+   if (s != null) {
+      try {
+         lsp_input = new FileWriter(s);
+       }
+      catch (IOException e) {
+         lsp_input = null;
+       }
+    }
 
    command = IvyFile.expandName(command,keys);
    LspLog.logD("Run server: " + command);
@@ -452,6 +465,7 @@ private void localDoSendMessage(String method,LspResponder resp,boolean wait,JSO
       try{
 	 message_stream.write(buf.toString());
 	 message_stream.flush();
+         if (lsp_input != null) lsp_input.write(buf.toString());
        }
       catch (IOException e) {
 	 LspLog.logE("Problem writing message",e);
@@ -500,6 +514,7 @@ private void localSendResponse(int id,Object result,JSONObject err)
       try{
 	 message_stream.write(buf.toString());
 	 message_stream.flush();
+         if (lsp_input != null) lsp_input.write(buf.toString());
        }
       catch (IOException e) {
 	 LspLog.logE("Problem writing response",e);

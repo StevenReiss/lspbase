@@ -192,7 +192,7 @@ static void outputDiagnostic(LspBaseFile file,JSONObject diagnostic,IvyXmlWriter
       if (c != null && c.equals("TODO")) xw.field("TODO",true);
       else xw.field("NOTICE",true);
     }
-   else if (sev == 4) xw.field("HINT",true);
+   else if (sev >= 4) xw.field("HINT",true);
    
    outputProblemRange(file,diagnostic.getJSONObject("range"),xw);
   

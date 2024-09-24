@@ -98,6 +98,12 @@ LspBaseFile(LspBaseProject proj,File f,String lang)
    file_symbols = null;
    base_ids = new HashSet<>();
    private_buffers = new HashMap<>();
+   if (proj.getLanguageData().getCapabilityBool("lsp.mustOpenFiles")) {
+      try {
+         open(null,false);
+       }
+      catch (LspBaseException e) { }
+    }
 }
 
 
@@ -521,11 +527,17 @@ synchronized void clearSymbols()
 
 void open(String bid) throws LspBaseException
 {
+   open(bid,true);
+}
+
+
+void open(String bid,boolean contents) throws LspBaseException
+{
    if (bid != null && !bid.startsWith("*")) base_ids.add(bid);
 
+   if (contents) loadContents();
+   
    if (file_version > 0) return;
-
-   getContents();
 
    for_project.openFile(this);
    file_version = 1;
