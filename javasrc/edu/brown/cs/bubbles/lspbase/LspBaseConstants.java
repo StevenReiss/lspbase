@@ -1,34 +1,34 @@
 /********************************************************************************/
-/*                                                                              */
-/*              LspBaseConstants.java                                           */
-/*                                                                              */
-/*      Bubbles back end that uses Language Server Protocol (LSP)               */
-/*                                                                              */
+/*										*/
+/*		LspBaseConstants.java						*/
+/*										*/
+/*	Bubbles back end that uses Language Server Protocol (LSP)		*/
+/*										*/
 /********************************************************************************/
-/*      Copyright 2013 Brown University -- Steven P. Reiss                    */
+/*	Copyright 2013 Brown University -- Steven P. Reiss		      */
 /*********************************************************************************
- *  Copyright 2013, Brown University, Providence, RI.                            *
- *                                                                               *
- *                        All Rights Reserved                                    *
- *                                                                               *
- *  Permission to use, copy, modify, and distribute this software and its        *
- *  documentation for any purpose other than its incorporation into a            *
- *  commercial product is hereby granted without fee, provided that the          *
- *  above copyright notice appear in all copies and that both that               *
- *  copyright notice and this permission notice appear in supporting             *
- *  documentation, and that the name of Brown University not be used in          *
- *  advertising or publicity pertaining to distribution of the software          *
- *  without specific, written prior permission.                                  *
- *                                                                               *
- *  BROWN UNIVERSITY DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS                *
- *  SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND            *
- *  FITNESS FOR ANY PARTICULAR PURPOSE.  IN NO EVENT SHALL BROWN UNIVERSITY      *
- *  BE LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY          *
- *  DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,              *
- *  WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS               *
- *  ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE          *
- *  OF THIS SOFTWARE.                                                            *
- *                                                                               *
+ *  Copyright 2013, Brown University, Providence, RI.				 *
+ *										 *
+ *			  All Rights Reserved					 *
+ *										 *
+ *  Permission to use, copy, modify, and distribute this software and its	 *
+ *  documentation for any purpose other than its incorporation into a		 *
+ *  commercial product is hereby granted without fee, provided that the 	 *
+ *  above copyright notice appear in all copies and that both that		 *
+ *  copyright notice and this permission notice appear in supporting		 *
+ *  documentation, and that the name of Brown University not be used in 	 *
+ *  advertising or publicity pertaining to distribution of the software 	 *
+ *  without specific, written prior permission. 				 *
+ *										 *
+ *  BROWN UNIVERSITY DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS		 *
+ *  SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND		 *
+ *  FITNESS FOR ANY PARTICULAR PURPOSE.  IN NO EVENT SHALL BROWN UNIVERSITY	 *
+ *  BE LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY 	 *
+ *  DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,		 *
+ *  WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS		 *
+ *  ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE 	 *
+ *  OF THIS SOFTWARE.								 *
+ *										 *
  ********************************************************************************/
 
 
@@ -49,9 +49,9 @@ interface LspBaseConstants
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Message server constants                                                */
-/*                                                                              */
+/*										*/
+/*	Message server constants						*/
+/*										*/
 /********************************************************************************/
 
 String LSPBASE_MINT_NAME = "BUBBLES_" + System.getProperty("user.name").replace(" ","_");
@@ -76,9 +76,9 @@ enum LspBaseLogLevel {
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Callback classes                                                        */
-/*                                                                              */
+/*										*/
+/*	Callback classes							*/
+/*										*/
 /********************************************************************************/
 
 interface LspResponder { };
@@ -104,7 +104,7 @@ interface LspNamer {
 
 
 /********************************************************************************/
-/*									        */
+/*										*/
 /*	Thread pool information 						*/
 /*										*/
 /********************************************************************************/
@@ -116,9 +116,9 @@ long LSPBASE_POOL_KEEP_ALIVE_TIME = 2*60*1000;
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Editing Constants                                                       */
-/*                                                                              */
+/*										*/
+/*	Editing Constants							*/
+/*										*/
 /********************************************************************************/
 
 String TOKEN_TYPES = "semanticTokensProvider.legend.tokenTypes";
@@ -128,19 +128,19 @@ String TOKEN_MODS = "semanticTokensProvider.legend.tokenModifiers";
 class LineCol {
    private int line_number;
    private int col_number;
-   
+
    LineCol(int line,int col) {
       line_number = line;
       col_number = col;
     }
-   
-   int getLine()                                { return line_number; }
-   int getColumn()                              { return col_number; }
-   
-   int getLspLine()                             { return line_number - 1; }
-   int getLspColumn()                           { return col_number - 1; }
-   
-}       // end of inner class LineCol
+
+   int getLine()				{ return line_number; }
+   int getColumn()				{ return col_number; }
+
+   int getLspLine()				{ return line_number - 1; }
+   int getLspColumn()				{ return col_number - 1; }
+
+}	// end of inner class LineCol
 
 
 interface FindResult {
@@ -152,13 +152,13 @@ interface FindResult {
 int	MAX_TEXT_SEARCH_RESULTS = 128;
 
 class TextSearchData {
-   
+
    private Pattern search_pattern;
    private int max_result;
    private int total_files;
    private int files_done;
    private int serial_number;
-   
+
    TextSearchData(Pattern p,int max) {
       search_pattern = p;
       max_result = max;
@@ -166,12 +166,12 @@ class TextSearchData {
       files_done = 0;
       serial_number = 0;
     }
-   
-   Pattern getPattern()                         { return search_pattern; }
-   
-   void addFileCount(int ct)                    { total_files += ct; }
-   
-   int getResultCount()                         { return max_result; }
+
+   Pattern getPattern() 			{ return search_pattern; }
+
+   void addFileCount(int ct)			{ total_files += ct; }
+
+   int getResultCount() 			{ return max_result; }
    boolean noteResult() {
       --max_result;
       return max_result > 0;
@@ -183,20 +183,20 @@ class TextSearchData {
    double getPercentDone() {
       return ((double) files_done) / ((double) total_files);
     }
-   
+
    synchronized int getNextSerialNumber() {
       return ++serial_number;
     }
-   
-}       // end of inner class TextSearchData 
-   
+
+}	// end of inner class TextSearchData
+
 
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Specification Decoding                                                  */
-/*                                                                              */
+/*										*/
+/*	Specification Decoding							*/
+/*										*/
 /********************************************************************************/
 
 String [] SymbolKinds = {
@@ -211,7 +211,7 @@ String [] SymbolKinds = {
 String [] CompletionKinds = {
       "OTHER", "OTHER", "METHOD_REF", "METHOD_REF", "METHOD_REF",
       "FIELD_REF", "LOCAL_VARIABLE_REF", "TYPE_REF", "TYPE_REF", "PACKAGE_REF",
-      "FIELD_REF", "OTHER", "OTHER", "TYPE_REF", "KEYWORD", 
+      "FIELD_REF", "OTHER", "OTHER", "TYPE_REF", "KEYWORD",
       "OTHER", "OTHER", "OTHER", "OTHER", "OTHER",
       "FIELD_REF", "OTHER", "TYPE_REF", "OTHER", "OTHER",
       "TYPE_REF"
@@ -222,15 +222,15 @@ String PRIVATE_PREFIX = "_private_buffer_";
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Runtime constants                                                       */
-/*                                                                              */
+/*										*/
+/*	Runtime constants							*/
+/*										*/
 /********************************************************************************/
 
 enum BreakType {
    NONE,
    LINE,
-   EXCEPTION, 
+   EXCEPTION,
    FUNCTION,
    DATA,
 }
@@ -262,15 +262,16 @@ enum LspBaseDebugAction {
    STEP_OVER,
    STEP_RETURN,
    SUSPEND,
-   DROP_TO_FRAME
+   DROP_TO_FRAME,
+   RESTART
 }
 
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      File locations                                                          */
-/*                                                                              */
+/*										*/
+/*	File locations								*/
+/*										*/
 /********************************************************************************/
 
 
@@ -279,29 +280,29 @@ String BREAKPOINT_FILE = ".breakpoints";
 
 
 class IdCounter {
-   
+
    private int counter_value;
-   
+
    IdCounter() {
       counter_value = 1;
     }
-   
+
    synchronized public int nextValue() {
       return counter_value++;
     }
-   
+
    synchronized public void noteValue(int v) {
       if (counter_value <= v) counter_value = v+1;
     }
 
-}       // end of inner class IdCounter
+}	// end of inner class IdCounter
 
 
 
 /********************************************************************************/
-/*                                                                              */
-/*      Helper methods                                                          */
-/*                                                                              */
+/*										*/
+/*	Helper methods								*/
+/*										*/
 /********************************************************************************/
 
 public default String getUri(File f)
@@ -311,7 +312,7 @@ public default String getUri(File f)
    if (!s.startsWith("file:///")) {
       s = "file:///" + s.substring(6);
     }
-   
+
    return s;
 }
 
@@ -344,7 +345,7 @@ public default JSONArray createJsonArray(Object ... elts)
 
 
 
-}       // end of interface LspBaseConstants
+}	// end of interface LspBaseConstants
 
 
 
