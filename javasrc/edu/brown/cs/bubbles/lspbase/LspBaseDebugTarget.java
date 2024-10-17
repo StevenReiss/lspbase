@@ -320,6 +320,15 @@ void debugAction(LspBaseDebugAction action,String threadid,String frameid,IvyXml
                   thrd.debugAction(action,null);
                 }
              }
+            return;
+         case RESTART :
+            for (LspBaseDebugThread thrd : thread_data.values()) {
+               if (!thrd.isStopped()) {
+                  thrd.debugAction(LspBaseDebugAction.TERMINATE,null);
+                }
+             }
+            debug_protocol.sendRequest("restart",null);
+           return;
        }
     }
    
