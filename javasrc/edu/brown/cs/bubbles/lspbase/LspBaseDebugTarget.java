@@ -152,6 +152,10 @@ LspBaseLanguageData getLanguageData()
    LspBaseLanguageData ld = null;
    if (file != null) ld = file.getLanguageData();
    if (ld == null && proj != null) ld = proj.getLanguageData();
+   if (ld == null) {
+       LspLog.logX("Can't find language data for project " + f + proj.getName() + 
+             file);
+    }
    return ld;
 }
 
