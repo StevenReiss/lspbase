@@ -469,6 +469,10 @@ void handleEditCommand(String cmd,String proj,Element xml,IvyXmlWriter xw)
 	       IvyXml.getTextElement(xml,"CONTENTS"), xw);
          break;
          
+      case "FINDBYLINE" :
+         LspLog.logE("FindByLine not implemented yet");
+         break;
+         
       default :
 	 LspLog.logE("Unknown project edit command " + cmd);
 	 break;     

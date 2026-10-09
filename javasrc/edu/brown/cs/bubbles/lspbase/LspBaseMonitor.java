@@ -263,6 +263,7 @@ private String handleCommand(String cmd,String proj,Element xml) throws LspBaseE
       case "CREATEPACKAGE" :
       case "CREATEFILE" :
       case "CREATECLASS" :
+      case "FINDBYLINE" :
          lsp_base.getProjectManager().handleEditCommand(cmd,proj,xml,xw);
          break;
       case "LAUNCHQUERY" :
@@ -290,6 +291,10 @@ private String handleCommand(String cmd,String proj,Element xml) throws LspBaseE
       case "SAVEWORKSPACE" :
          xw.text("SAVED");
          break;
+         
+      case "BEGINTASK" :
+      case "ENDTASK" :
+         
          
       default :
 	 xw.close();
